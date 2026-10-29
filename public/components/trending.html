@@ -1,0 +1,8 @@
+<section class="space-y-6 max-w-4xl mx-auto">
+    <div class="flex items-center justify-between border-b border-white/10 pb-4"><h2 class="text-2xl font-bold">Trending Carousel Management</h2><button onclick="switchTab('dashboard')" class="text-white/50 hover:text-white" aria-label="Close"><i class="fa-solid fa-xmark text-xl"></i></button></div>
+    <div class="text-sm text-cyan-400 mb-4"><span id="trending-count">0</span> Audiobooks Active</div><div id="trending-list" class="space-y-3"></div>
+</section>
+<script>
+function renderTrending() { const list = document.getElementById('trending-list'); if (!list) return; document.getElementById('trending-count').innerText = globalAudiobooks.length; list.innerHTML = globalAudiobooks.map((book, index) => `<div class="bg-[#131722] border border-white/10 p-4 rounded-xl flex items-center justify-between"><div class="text-sm font-bold">#${index + 1} ${book.title} <span class="text-xs text-white/50">(${book.author})</span></div></div>`).join(''); }
+renderTrending();
+</script>

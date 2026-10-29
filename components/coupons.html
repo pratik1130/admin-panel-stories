@@ -1,0 +1,12 @@
+<section class="space-y-6 max-w-4xl mx-auto">
+    <div class="flex items-center justify-between border-b border-white/10 pb-4"><h2 class="text-2xl font-bold">Coupon & Offers Management</h2><button onclick="switchTab('dashboard')" class="text-white/50 hover:text-white" aria-label="Close"><i class="fa-solid fa-xmark text-xl"></i></button></div>
+    <div class="bg-[#131722] border border-white/10 p-6 rounded-2xl shadow-xl space-y-4"><div class="grid grid-cols-1 sm:grid-cols-3 gap-4"><input type="text" id="coupon-code" placeholder="e.g. SUI1997" class="bg-[#0B0F19] border border-white/20 rounded-xl px-4 py-3 text-sm uppercase text-white"><input type="number" id="coupon-discount" placeholder="Discount %" class="bg-[#0B0F19] border border-white/20 rounded-xl px-4 py-3 text-sm text-white"><input type="date" id="coupon-expiry" class="bg-[#0B0F19] border border-white/20 rounded-xl px-4 py-3 text-sm text-white"></div><button id="btn-create" onclick="createOrUpdateCoupon()" class="px-6 py-3 bg-purple-600 text-white font-bold text-sm rounded-xl">Create & Sync Coupon</button></div>
+    <div id="coupon-list" class="space-y-3"></div>
+</section>
+<script>
+var coupons = coupons || [{ id: 1, code: 'SUI1997', discount: 10, expiry: '2026-12-31', status: 'ACTIVE' }];
+function renderCoupons() { const list = document.getElementById('coupon-list'); if (!list) return; list.innerHTML = coupons.map((coupon, index) => `<div class="bg-[#131722] border border-white/10 p-4 rounded-xl flex items-center justify-between gap-4"><div><div class="text-sm font-bold text-cyan-400">${coupon.code} (${coupon.discount}% OFF)</div><div class="text-xs text-white/40">Valid until: ${coupon.expiry}</div></div><button onclick="deleteCoupon(${index})" class="p-2 bg-red-600/20 text-red-400 rounded-lg text-xs" aria-label="Delete coupon"><i class="fa-solid fa-trash"></i></button></div>`).join(''); }
+function createOrUpdateCoupon() { const code = document.getElementById('coupon-code').value; const discount = document.getElementById('coupon-discount').value; const expiry = document.getElementById('coupon-expiry').value; if (!code || !discount || !expiry) { alert('कृपया सर्व फील्ड्स भरा.'); return; } coupons.push({ id: Date.now(), code: code.toUpperCase(), discount, expiry, status: 'ACTIVE' }); alert('कूपन तयार झाले!'); renderCoupons(); }
+function deleteCoupon(index) { coupons.splice(index, 1); renderCoupons(); }
+renderCoupons();
+</script>

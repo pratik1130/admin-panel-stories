@@ -1,0 +1,9 @@
+<section class="space-y-6 max-w-4xl mx-auto">
+    <div class="flex items-center justify-between border-b border-white/10 pb-4"><h2 class="text-2xl font-bold">Registered Users Management</h2><button onclick="switchTab('dashboard')" class="text-white/50 hover:text-white" aria-label="Close"><i class="fa-solid fa-xmark text-xl"></i></button></div>
+    <div class="flex items-center justify-between text-sm"><span class="text-white/60">Registered users</span><span id="users-component-count" class="text-cyan-400 font-bold">0</span></div>
+    <div id="users-list" class="space-y-3"></div>
+</section>
+<script>
+function renderRegisteredUsers() { const list = document.getElementById('users-list'); if (!list) return; const entries = Object.entries(globalUsers); document.getElementById('users-component-count').innerText = entries.length; list.innerHTML = entries.length ? entries.map(([id, user]) => `<div class="bg-[#131722] border border-white/10 p-4 rounded-xl flex items-center justify-between gap-4"><div><div class="text-sm font-bold text-white">${user.name || user.displayName || user.email || id}</div><div class="text-xs text-white/40">${user.email || 'No email provided'}</div></div><span class="px-3 py-1 bg-cyan-500/10 text-cyan-300 text-xs rounded-full">Registered</span></div>`).join('') : '<div class="p-4 text-center text-white/40">No registered users found.</div>'; }
+renderRegisteredUsers();
+</script>
