@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel - Complete Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-storage-compat.js"></script>
+</head>
+<body class="bg-[#0B0F19] text-white font-sans antialiased m-0 p-0">
+<div class="flex h-screen overflow-hidden">
+    <aside class="w-64 bg-[#131722] border-r border-white/10 flex flex-col justify-between hidden md:flex">
+        <div class="p-6">
+            <div class="text-xl font-black text-cyan-400 tracking-wider mb-8">Admin Panel</div>
+            <nav class="space-y-1.5" aria-label="Admin sections">
+                <button onclick="switchTab('dashboard')" id="nav-dashboard" class="nav-item w-full flex items-center gap-3 px-4 py-2.5 rounded-xl bg-cyan-500/20 text-cyan-300 font-semibold text-sm transition-all"><i class="fa-solid fa-chart-pie w-5"></i> Dashboard</button>
+                <button onclick="switchTab('upload')" id="nav-upload" class="nav-item w-full flex items-center gap-3 px-4 py-2.5 rounded-xl hover:bg-white/5 text-white/70 hover:text-white font-semibold text-sm transition-all"><i class="fa-solid fa-cloud-arrow-up w-5"></i> Add Audiobook</button>
+                <button onclick="switchTab('login_bg')" id="nav-login_bg" class="nav-item w-full flex items-center gap-3 px-4 py-2.5 rounded-xl hover:bg-white/5 text-white/70 hover:text-white font-semibold text-sm transition-all"><i class="fa-solid fa-image w-5"></i> Login Screen BG</button>
+                <button onclick="switchTab('coupons')" id="nav-coupons" class="nav-item w-full flex items-center gap-3 px-4 py-2.5 rounded-xl hover:bg-white/5 text-white/70 hover:text-white font-semibold text-sm transition-all"><i class="fa-solid fa-tags w-5"></i> Coupons & Offers</button>
+                <button onclick="switchTab('trending')" id="nav-trending" class="nav-item w-full flex items-center gap-3 px-4 py-2.5 rounded-xl hover:bg-white/5 text-white/70 hover:text-white font-semibold text-sm transition-all"><i class="fa-solid fa-fire w-5"></i> Trending Carousel</button>
+                <button onclick="switchTab('section_ordering')" id="nav-section_ordering" class="nav-item w-full flex items-center gap-3 px-4 py-2.5 rounded-xl hover:bg-white/5 text-white/70 hover:text-white font-semibold text-sm transition-all"><i class="fa-solid fa-list-ol w-5"></i> Section Ordering</button>
+                <button onclick="switchTab('broadcast')" id="nav-broadcast" class="nav-item w-full flex items-center gap-3 px-4 py-2.5 rounded-xl hover:bg-white/5 text-white/70 hover:text-white font-semibold text-sm transition-all"><i class="fa-solid fa-bullhorn w-5"></i> Push Broadcast</button>
+                <button onclick="switchTab('users')" id="nav-users" class="nav-item w-full flex items-center gap-3 px-4 py-2.5 rounded-xl hover:bg-white/5 text-white/70 hover:text-white font-semibold text-sm transition-all"><i class="fa-solid fa-users w-5"></i> Users</button>
+            </nav>
+        </div>
+        <div class="p-6 border-t border-white/10"><button onclick="logoutAdmin()" class="flex items-center gap-2 text-red-400 hover:text-red-300 text-sm font-semibold transition-colors"><i class="fa-solid fa-right-from-bracket"></i> Log Out</button></div>
+    </aside>
+
+    <main id="main-content" class="flex-1 overflow-y-auto p-6 md:p-10">
+        <div id="dashboard-view" class="space-y-6">
+            <h1 class="text-2xl font-bold">Dashboard Overview (Firebase Live)</h1>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <div class="p-6 bg-[#131722] border border-white/10 rounded-2xl shadow-xl"><div class="text-white/60 text-sm font-medium">Total Audiobooks (Live)</div><div class="text-3xl font-black text-cyan-400 mt-2" id="live-audiobook-count">0</div></div>
+                <div class="p-6 bg-[#131722] border border-white/10 rounded-2xl shadow-xl"><div class="text-white/60 text-sm font-medium">Total Users (Live)</div><div class="text-3xl font-black text-purple-400 mt-2" id="live-user-count">0</div></div>
+            </div>
+            <div id="firebase-connection-status" class="text-xs text-white/50" role="status">Checking Firebase connection...</div>
+            <div class="pt-4 flex flex-wrap gap-4">
+                <button onclick="switchTab('upload')" class="px-5 py-3 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded-xl shadow-lg transition-all flex items-center gap-2"><i class="fa-solid fa-plus"></i> Add New Audiobook</button>
+                <button onclick="switchTab('section_ordering')" class="px-5 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl shadow-lg transition-all flex items-center gap-2"><i class="fa-solid fa-list-ol"></i> Section Ordering</button>
+                <button onclick="switchTab('trending')" class="px-5 py-3 bg-pink-600 hover:bg-pink-500 text-white font-bold rounded-xl shadow-lg transition-all flex items-center gap-2"><i class="fa-solid fa-fire"></i> Trending Carousel</button>
+                <button onclick="switchTab('coupons')" class="px-5 py-3 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-xl shadow-lg transition-all flex items-center gap-2"><i class="fa-solid fa-tags"></i> Manage Coupons</button>
+            </div>
+            <div class="bg-[#131722] border border-white/10 p-6 rounded-2xl shadow-xl space-y-4 mt-6"><h3 class="text-sm font-bold text-white/80">All Uploaded Audiobooks on Firebase (Live Sync)</h3><div id="firebase-audiobooks-list" class="space-y-3"><div class="text-xs text-white/40">Loading data...</div></div></div>
+        </div>
+        <div id="component-view" class="hidden opacity-0 transition-opacity duration-200" aria-live="polite"></div>
+    </main>
+</div>
+<script>
+const firebaseConfig = {
+    apiKey: "AIzaSyA4ICBmqlCSpjInjTaQt3Bhg2BLXm_lqTM",
+    authDomain: "majestic-boulevard-mxctm.firebaseapp.com",
+    databaseURL: "https://majestic-boulevard-mxctm-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "majestic-boulevard-mxctm",
+    storageBucket: "majestic-boulevard-mxctm.firebasestorage.app",
+    messagingSenderId: "280298206143",
+    appId: "1:280298206143:web:5748c78e3e5444650f670a"
+};
+
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.database();
+const storage = firebase.storage();
+let globalAudiobooks = [];
+let globalUsers = {};
+let activeComponent = null;
+let dashboardCoverObjectUrls = [];
+
+const componentFiles = {
+    upload: 'components/add-audiobook.html',
+    login_bg: 'components/login-bg.html',
+    coupons: 'components/coupons.html',
+    trending: 'components/trending.html',
+    section_ordering: 'components/section-ordering.html',
+    broadcast: 'components/broadcast.html',
+    users: 'components/users.html'
+};
+
+function setActiveNavigation(tabId) {
+    document.querySelectorAll('.nav-item').forEach(button => {
+        button.classList.remove('bg-cyan-500/20', 'text-cyan-300');
+        button.classList.add('text-white/70');
+    });
+    const active = document.getElementById('nav-' + tabId);
+    if (active) { active.classList.add('bg-cyan-500/20', 'text-cyan-300'); active.classList.remove('text-white/70'); }
+}
+
+async function logoutAdmin() {
+    try {
+        await auth.signOut();
+        window.location.replace('/');
+    } catch (error) {
+        console.error('Unable to sign out:', error);
+        const status = document.getElementById('firebase-connection-status');
+        status.textContent = `Unable to sign out: ${error.message}`;
+        status.className = 'text-xs text-red-400';
+    }
+}
+
+function renderDashboardAudiobooks(list) {
+    dashboardCoverObjectUrls.forEach(url => URL.revokeObjectURL(url));
+    dashboardCoverObjectUrls = [];
+    list.replaceChildren();
+
+    if (!globalAudiobooks.length) {
+        list.innerHTML = '<div class="text-xs text-white/40">No audiobooks uploaded yet.</div>';
+        return;
+    }
+
+    globalAudiobooks.forEach(book => {
+        const row = document.createElement('div');
+        row.className = 'bg-[#0B0F19] border border-white/10 p-3.5 rounded-xl flex items-center justify-between gap-4';
+        const details = document.createElement('div');
+        details.className = 'flex items-center gap-3';
+        const image = document.createElement('img');
+        image.alt = '';
+        image.className = 'w-10 h-12 object-cover rounded-lg border border-white/10';
+        if (book.coverImagePath) {
+            storage.ref(book.coverImagePath).getBlob().then(blob => {
+                if (!image.isConnected) return;
+                const objectUrl = URL.createObjectURL(blob);
+                dashboardCoverObjectUrls.push(objectUrl);
+                image.src = objectUrl;
+            }).catch(error => {
+                console.error('Unable to load audiobook cover:', error);
+            });
+        } else if (book.coverImageUrl) {
+            image.src = book.coverImageUrl;
+        }
+
+        const text = document.createElement('div');
+        const title = document.createElement('div');
+        title.className = 'text-sm font-bold text-white';
+        title.textContent = book.title || '';
+        const author = document.createElement('div');
+        author.className = 'text-xs text-white/40';
+        author.textContent = `Author: ${book.author || ''}`;
+        text.append(title, author);
+        details.append(image, text);
+
+        const badge = document.createElement('span');
+        badge.className = 'px-3 py-1 bg-emerald-500/20 text-emerald-400 text-xs font-bold rounded-full';
+        badge.textContent = 'Live on App';
+        row.append(details, badge);
+        list.append(row);
+    });
+}
+
+async function switchTab(tabId) {
+    setActiveNavigation(tabId);
+    const dashboard = document.getElementById('dashboard-view');
+    const componentView = document.getElementById('component-view');
+    if (tabId === 'dashboard') {
+        componentView.classList.add('opacity-0');
+        componentView.classList.add('hidden');
+        componentView.innerHTML = '';
+        activeComponent = null;
+        dashboard.classList.remove('hidden');
+        return;
+    }
+
+    const file = componentFiles[tabId];
+    if (!file) return;
+    dashboard.classList.add('hidden');
+    componentView.classList.add('opacity-0');
+    componentView.classList.remove('hidden');
+    componentView.innerHTML = '<div class="py-16 text-center text-white/50"><i class="fa-solid fa-spinner fa-spin mr-2"></i>Loading section...</div>';
+    try {
+        const response = await fetch(file, { cache: 'no-store' });
+        if (!response.ok) throw new Error(`Unable to load ${file} (${response.status})`);
+        const markup = await response.text();
+        const template = document.createElement('template');
+        template.innerHTML = markup;
+        const scripts = [...template.content.querySelectorAll('script')];
+        scripts.forEach(script => script.remove());
+        componentView.innerHTML = '';
+        componentView.append(template.content);
+        activeComponent = tabId;
+        scripts.forEach(original => { const script = document.createElement('script'); script.textContent = original.textContent; document.body.appendChild(script); script.remove(); });
+        requestAnimationFrame(() => componentView.classList.remove('opacity-0'));
+    } catch (error) {
+        componentView.innerHTML = `<div class="rounded-xl border border-red-500/30 bg-red-500/10 p-6 text-red-300">${error.message}</div>`;
+        console.error(error);
+    }
+}
+
+function fetchFirebaseData() {
+    const status = document.getElementById('firebase-connection-status');
+    const showDatabaseError = error => {
+        console.error('Firebase Realtime Database error:', error);
+        status.textContent = `Database error: ${error.message}`;
+        status.className = 'text-xs text-red-400';
+    };
+
+    db.ref('.info/connected').on('value', snapshot => {
+        status.textContent = snapshot.val() ? 'Firebase connected.' : 'Connecting to Firebase...';
+        status.className = snapshot.val() ? 'text-xs text-emerald-400' : 'text-xs text-white/50';
+    }, showDatabaseError);
+
+    db.ref('audiobooks/').on('value', snapshot => {
+        const data = snapshot.val() || {};
+        const keys = Object.keys(data);
+        document.getElementById('live-audiobook-count').innerText = keys.length;
+        globalAudiobooks = keys.map(id => ({ id, ...data[id] }));
+        const list = document.getElementById('firebase-audiobooks-list');
+        renderDashboardAudiobooks(list);
+        if (typeof renderTrending === 'function' && activeComponent === 'trending') renderTrending();
+        if (typeof loadSectionBooks === 'function' && activeComponent === 'section_ordering') loadSectionBooks();
+    }, showDatabaseError);
+
+    db.ref('users/').on('value', snapshot => {
+        globalUsers = snapshot.val() || {};
+        document.getElementById('live-user-count').innerText = Object.keys(globalUsers).length;
+        if (typeof renderRegisteredUsers === 'function' && activeComponent === 'users') renderRegisteredUsers();
+    }, showDatabaseError);
+}
+
+window.requireAdmin = async function() {
+    const user = auth.currentUser;
+    if (!user) throw new Error('Please sign in with an administrator account.');
+    const token = await user.getIdTokenResult();
+    if (token.claims.admin !== true) throw new Error('This account does not have the Firebase admin claim.');
+};
+
+window.waitForDatabaseConnection = function(timeoutMs = 15000) {
+    return new Promise((resolve, reject) => {
+        const connectedRef = db.ref('.info/connected');
+        const onConnectionChange = snapshot => {
+            if (snapshot.val() === true) finish();
+        };
+        const onError = error => finish(error);
+        const timeout = setTimeout(() => {
+            finish(new Error('Could not connect to Realtime Database. Check the configured database URL and network.'));
+        }, timeoutMs);
+
+        function finish(error) {
+            clearTimeout(timeout);
+            connectedRef.off('value', onConnectionChange);
+            if (error) reject(error);
+            else resolve();
+        }
+
+        connectedRef.on('value', onConnectionChange, onError);
+    });
+};
+
+async function initializeAdminDashboard() {
+    const user = await new Promise((resolve, reject) => {
+        const unsubscribe = auth.onAuthStateChanged(
+            currentUser => { unsubscribe(); resolve(currentUser); },
+            error => { unsubscribe(); reject(error); }
+        );
+    });
+    if (!user) {
+        window.location.replace('/');
+        return;
+    }
+
+    const token = await user.getIdTokenResult();
+    if (token.claims.admin !== true) {
+        await auth.signOut();
+        window.location.replace('/');
+        return;
+    }
+    fetchFirebaseData();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    initializeAdminDashboard().catch(error => {
+        console.error('Unable to initialize the admin dashboard:', error);
+        const status = document.getElementById('firebase-connection-status');
+        status.textContent = `Firebase initialization error: ${error.message}`;
+        status.className = 'text-xs text-red-400';
+    });
+});
+</script>
+</body>
+</html>

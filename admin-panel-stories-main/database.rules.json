@@ -1,0 +1,20 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "audiobooks": {
+      ".read": true,
+      "$bookId": {
+        ".write": "auth != null && auth.token.admin === true",
+        ".validate": "newData.hasChildren(['title', 'author', 'language', 'coverImagePath', 'episodes', 'createdAt']) && newData.child('title').isString() && newData.child('author').isString() && newData.child('language').isString() && newData.child('coverImagePath').isString() && newData.child('episodes').exists() && newData.child('createdAt').isNumber()"
+      }
+    },
+    "users": {
+      ".read": "auth != null && auth.token.admin === true",
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && (auth.uid === $uid || auth.token.admin === true)"
+      }
+    }
+  }
+}

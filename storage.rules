@@ -5,8 +5,11 @@ service firebase.storage {
       return request.auth != null && request.auth.token.admin == true;
     }
 
+    // Audio, covers and teasers must stay readable for the app's listeners.
+    // Only an admin can upload, replace or delete files.
     match /{allPaths=**} {
-      allow read, write: if isAdmin();
+      allow read: if true;
+      allow write: if isAdmin();
     }
   }
 }

@@ -1,0 +1,51 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() { return request.auth != null; }
+    function isAdmin()    { return isSignedIn() && request.auth.token.admin == true; }
+    function isOwner(uid) { return isSignedIn() && request.auth.uid == uid; }
+
+    // ---- Content: everybody can read, only admin can change ----
+    match /audiobooks/{id}   { allow read: if true; allow write: if isAdmin(); }
+    match /episodes/{id}     { allow read: if true; allow write: if isAdmin(); }
+    match /transcripts/{id}  { allow read: if true; allow write: if isAdmin(); }
+    match /settings/{id}     { allow read: if true; allow write: if isAdmin(); }
+    match /appSettings/{id}  { allow read: if true; allow write: if isAdmin(); }
+    match /coupons/{id}      { allow read: if true; allow write: if isAdmin(); }
+
+    // ---- Listen counters: the app increments them by 1 ----
+    match /audiobook_stats/{id} {
+      allow read: if true;
+      allow create: if isAdmin() || (
+        request.resource.data.keys().hasOnly(['listenCount', 'lastEvent', 'title', 'createdAt', 'updatedAt'])
+        && request.resource.data.listenCount is number
+      );
+      allow update: if isAdmin() || (
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['listenCount', 'lastEvent', 'title', 'updatedAt'])
+        && request.resource.data.listenCount is number
+        && request.resource.data.listenCount >= resource.data.listenCount
+        && request.resource.data.listenCount - resource.data.listenCount <= 1
+      );
+      allow delete: if isAdmin();
+    }
+
+    // ---- Per-user data: only the owner (and admin) ----
+    match /users/{uid}          { allow read, write: if isOwner(uid) || isAdmin(); }
+    match /user_libraries/{uid} { allow read, write: if isOwner(uid) || isAdmin(); }
+    match /user_coins/{uid}     { allow read, write: if isOwner(uid) || isAdmin(); }
+
+    match /subscriptions/{id} {
+      allow read: if isAdmin() || (isSignedIn() && (id == request.auth.uid || resource.data.userId == request.auth.uid));
+      allow write: if isAdmin();
+    }
+
+    match /fcm_tokens/{token} {
+      allow create, update: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow read, delete: if isAdmin();
+    }
+
+    // Everything else is closed.
+    match /{document=**} { allow read, write: if false; }
+  }
+}

@@ -1,7 +1,10 @@
 {
-  "database": {
-    "rules": "database.rules.json"
-  },
+  "firestore": [
+    {
+      "database": "ai-studio-audiostorytellin-1f7d4862-23fa-4201-99e8-8f3e17b87cf4",
+      "rules": "firestore.rules"
+    }
+  ],
   "storage": {
     "rules": "storage.rules"
   },
