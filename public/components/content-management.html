@@ -113,8 +113,8 @@
     const CATS = [['Popular','Popular'],['Trending','Trending'],['New','New & Hot'],['Horror','Horror'],['Thriller','Thriller'],['Suspense','Suspense'],['Romantic','Romantic'],['Education','Education']];
     const MB = 1024 * 1024;
     let stats = {};
-    let book = null;       
-    let eps = [];          
+    let book = null;
+    let eps = [];
     let coverFile = null;
     let dirty = false;
     let saving = false;
@@ -123,84 +123,127 @@
     const statusOf = b => b.publishingStatus || 'published';
     const INPUT = 'w-full bg-[#0B0F19] border border-white/20 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-cyan-400';
 
+    /* ------------------------------------------------------- SUBTITLE HELPERS */
+    // Segment shape matches what the mobile app already reads:
+    //   timed:  { start, text, wordCount }
+    //   auto:   { start, startFraction, text, wordCount }  (app maps startFraction onto the audio length)
+
+    function wordCount(s) { return s.trim().split(/\s+/).filter(Boolean).length; }
+
+    // Accepts "5", "5.5", "01:05", "1:05:00", "01:05,500". Returns NaN when unreadable.
     function parseTime(t) {
         if (typeof t === 'number') return t;
-        const p = String(t).trim().replace(',', '.').split(':').map(Number);
+        const s = String(t).trim().replace(',', '.');
+        const p = s.split(':').map(Number);
+        if (p.some(n => Number.isNaN(n))) return NaN;
         if (p.length === 3) return (p[0] * 3600) + (p[1] * 60) + p[2];
         if (p.length === 2) return (p[0] * 60) + p[1];
-        return parseFloat(t) || 0;
+        return parseFloat(s);
     }
 
     function formatTime(sec) {
         const s = Math.max(0, Math.floor(Number(sec) || 0));
-        const m = Math.floor(s / 60);
+        const h = Math.floor(s / 3600);
+        const m = Math.floor((s % 3600) / 60);
         const r = s % 60;
-        return `${String(m).padStart(2, '0')}:${String(r).padStart(2, '0')}`;
+        const mm = String(m).padStart(2, '0');
+        const rr = String(r).padStart(2, '0');
+        return h ? `${h}:${mm}:${rr}` : `${mm}:${rr}`;
     }
 
+    // Used only to show existing timed subtitles back in the editor.
     function segmentsToText(segs) {
         if (!Array.isArray(segs) || !segs.length) return '';
-        return segs.map(s => `${formatTime(s.start)} ${s.text || ''}`.trim()).join('\n');
+        const auto = segs.some(s => s.startFraction !== undefined);
+        return segs.map(s => auto ? (s.text || '') : `${formatTime(s.start)} ${s.text || ''}`.trim()).join('\n');
     }
 
-    function parseSubtitles(raw) {
-        const str = (raw || '').trim();
-        if (!str) return [];
+    function finishTimed(list) {
+        const segments = list
+            .map(x => ({ start: Math.max(0, Number(x.start) || 0), text: String(x.text || '').replace(/\s+/g, ' ').trim() }))
+            .filter(x => x.text)
+            .sort((a, b) => a.start - b.start)
+            .map(x => ({ start: x.start, text: x.text, wordCount: wordCount(x.text) }));
+        return { mode: segments.length ? 'timed' : 'none', segments };
+    }
 
+    // Plain text: no timings anywhere. The app spreads these lines over the audio length.
+    function autoSegments(lines) {
+        const parts = lines.join('\n').split(/[\n.।]+/).map(l => l.trim()).filter(Boolean);
+        const total = parts.reduce((acc, l) => acc + wordCount(l), 0);
+        let cumulative = 0;
+        const segments = parts.map(line => {
+            const text = /[\u0900-\u097F]/.test(line) ? line + '।' : line + '.';
+            const wc = wordCount(line);
+            const seg = { start: cumulative * 0.5, startFraction: total > 0 ? cumulative / total : 0, text, wordCount: wc };
+            cumulative += wc;
+            return seg;
+        });
+        return { mode: segments.length ? 'auto' : 'none', segments };
+    }
+
+    // Returns { mode: 'timed' | 'auto' | 'none', segments: [...] }
+    function parseSubtitles(raw) {
+        const str = (raw || '').replace(/\r\n?/g, '\n').replace(/^\uFEFF/, '').trim();
+        if (!str) return { mode: 'none', segments: [] };
+
+        // (1) JSON array: [{ "start": 5, "text": "..." }, ...]
         if (str.startsWith('[')) {
             try {
                 const arr = JSON.parse(str);
                 if (Array.isArray(arr)) {
-                    return arr.map((x, idx) => ({
-                        start: parseTime(x.start ?? x.startTime ?? idx * 5),
-                        end: parseTime(x.end ?? x.endTime ?? (parseTime(x.start ?? idx * 5) + 5)),
-                        text: String(x.text || '').trim()
-                    })).filter(x => x.text);
+                    const items = arr
+                        .map(x => ({ start: parseTime(x.start ?? x.startTime ?? 0), text: String(x.text || '').trim() }))
+                        .filter(x => x.text && !Number.isNaN(x.start));
+                    if (items.length) return finishTimed(items);
                 }
-            } catch (_) {}
+            } catch (_) { /* not JSON, fall through */ }
         }
 
+        // (2) .srt / .vtt blocks (only the start time is kept; the app does not use end times)
         if (str.includes('-->')) {
-            const blocks = str.replace(/\r\n/g, '\n').replace(/^WEBVTT[^\n]*\n+/i, '').split(/\n\s*\n/);
-            const out = [];
+            const blocks = str.replace(/^WEBVTT[^\n]*\n+/i, '').split(/\n\s*\n/);
+            const items = [];
             for (const b of blocks) {
                 const lines = b.trim().split('\n');
-                const arrowIdx = lines.findIndex(l => l.includes('-->'));
-                if (arrowIdx !== -1) {
-                    const times = lines[arrowIdx].split('-->');
-                    const start = parseTime(times[0]);
-                    const end = parseTime(times[1].split(' ')[0]);
-                    const text = lines.slice(arrowIdx + 1).join(' ').replace(/<[^>]+>/g, '').trim();
-                    if (text) out.push({ start, end: end > start ? end : start + 5, text });
+                const i = lines.findIndex(l => l.includes('-->'));
+                if (i === -1) continue;
+                const start = parseTime(lines[i].split('-->')[0].trim());
+                const text = lines.slice(i + 1).join(' ').replace(/<[^>]+>/g, '').trim();
+                if (text && !Number.isNaN(start)) items.push({ start, text });
+            }
+            if (items.length) return finishTimed(items);
+        }
+
+        // (3) Line by line. A line may start with a time: "00:05 text", "[1:05:00] text", "00:05 - 00:09 text".
+        const lines = str.split('\n').map(l => l.trim()).filter(Boolean);
+        const lineRe = /^\[?(\d{1,2}(?::\d{2}){1,2}(?:[.,]\d{1,3})?)\]?(?:\s*-\s*\d{1,2}(?::\d{2}){1,2}(?:[.,]\d{1,3})?)?\s*[-–:]?\s*(.*)$/;
+        const timed = [];
+        const leading = [];
+        let anyTimed = false;
+
+        for (const line of lines) {
+            const m = line.match(lineRe);
+            if (m) {
+                const start = parseTime(m[1]);
+                if (!Number.isNaN(start)) {
+                    anyTimed = true;
+                    timed.push({ start, text: m[2] || '' });
+                    continue;
                 }
             }
-            if (out.length) return out;
+            // A line without a time continues the previous timed line.
+            if (timed.length) timed[timed.length - 1].text += ' ' + line;
+            else leading.push(line);
         }
 
-        const lines = str.replace(/\r\n/g, '\n').split('\n').map(l => l.trim()).filter(Boolean);
-        const temp = [];
-        lines.forEach((line, idx) => {
-            const m = line.match(/^(\d{1,2}:\d{2}(?::\d{2})?(?:[.,]\d{1,3})?)\s*(?:-\s*(\d{1,2}:\d{2}(?::\d{2})?(?:[.,]\d{1,3})?))?\s+(.+)$/);
-            if (m) {
-                temp.push({
-                    start: parseTime(m[1]),
-                    end: m[2] ? parseTime(m[2]) : null,
-                    text: m[3].trim()
-                });
-            } else {
-                const prevEnd = temp.length ? (temp[temp.length - 1].end || temp[temp.length - 1].start + 5) : idx * 5;
-                temp.push({ start: prevEnd, end: null, text: line });
-            }
-        });
-
-        for (let i = 0; i < temp.length; i++) {
-            if (temp[i].end === null || temp[i].end <= temp[i].start) {
-                temp[i].end = (i + 1 < temp.length && temp[i + 1].start > temp[i].start)
-                    ? temp[i + 1].start
-                    : temp[i].start + 5;
-            }
+        if (anyTimed) {
+            if (leading.length) timed.unshift({ start: 0, text: leading.join(' ') });
+            return finishTimed(timed);
         }
-        return temp;
+
+        // (4) Nothing has a time: automatic sync.
+        return autoSegments(lines);
     }
 
     /* ------------------------------------------------------------------ LIST */
@@ -279,7 +322,12 @@
         });
     }
 
-    function showList() { $('cm-editor').classList.add('hidden'); $('cm-listview').classList.remove('hidden'); book = null; eps = []; coverFile = null; dirty = false; if (typeof window.loadAudiobooks === 'function') window.loadAudiobooks(); }
+    function showList() {
+        $('cm-editor').classList.add('hidden');
+        $('cm-listview').classList.remove('hidden');
+        book = null; eps = []; coverFile = null; dirty = false;
+        if (typeof window.loadAudiobooks === 'function') window.loadAudiobooks();
+    }
 
     function leaveEditor() {
         if (saving) return;
@@ -319,7 +367,10 @@
             eps = epSnap.docs.map(d => {
                 const x = d.data();
                 const tr = trByEp[d.id];
-                const subText = tr ? (tr.rawText || segmentsToText(tr.segments)) : (x.subtitlesText || '');
+                // Prefer the original text the admin typed, so auto-sync is never turned into fake timings.
+                const subText = tr && tr.rawText ? tr.rawText
+                    : tr ? segmentsToText(tr.segments)
+                    : (x.transcriptText || x.subtitlesText || '');
                 return {
                     id: d.id, isNew: false, deleted: false,
                     number: x.episodeNumber || 0,
@@ -455,7 +506,7 @@
         const subTitleWrap = el('div', '');
         subTitleWrap.append(
             el('div', 'text-xs font-bold text-cyan-300', 'Subtitles / Transcript'),
-            el('div', 'text-[11px] text-white/40', 'Format: "00:05 Your sentence" per line, or upload a .srt / .vtt file.')
+            el('div', 'text-[11px] text-white/40', 'Option 1: plain text, one sentence per line (auto-synced to the audio). Option 2: "00:05 sentence" per line for exact timing, or upload .srt / .vtt.')
         );
 
         const subFileLabel = el('label', 'px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/15 rounded-lg text-xs text-cyan-300 cursor-pointer shrink-0 inline-flex items-center gap-1.5 self-start');
@@ -467,14 +518,18 @@
 
         const subTextarea = document.createElement('textarea');
         subTextarea.rows = 4;
-        subTextarea.placeholder = 'e.g.\n00:00 It was a dark night...\n00:05 Someone knocked on the door.';
+        subTextarea.placeholder = 'e.g.\n00:00 It was a dark night...\n00:05 Someone knocked on the door.\n\nOr just plain text, one sentence per line (auto-synced).';
         subTextarea.value = ep.subtitlesText || '';
         subTextarea.className = INPUT + ' font-mono text-xs';
 
         const subCount = el('div', 'text-[11px] text-white/40', '');
         function updateSubCount() {
-            const segs = parseSubtitles(ep.subtitlesText);
-            subCount.textContent = segs.length ? `✓ ${segs.length} subtitle lines ready for audio sync.` : 'No subtitles added yet.';
+            const p = parseSubtitles(ep.subtitlesText);
+            subCount.textContent = !p.segments.length
+                ? 'No subtitles added yet.'
+                : `✓ ${p.segments.length} lines • ` + (p.mode === 'timed'
+                    ? 'exact timing (follows the audio clock)'
+                    : 'auto-sync (spread over the audio length by word count)');
         }
         updateSubCount();
 
@@ -489,9 +544,9 @@
             if (!f) return;
             try {
                 const text = await f.text();
-                const parsed = parseSubtitles(text);
-                ep.subtitlesText = parsed.length ? segmentsToText(parsed) : text;
-                subTextarea.value = ep.subtitlesText;
+                // Keep the file's text as typed; it is parsed again on save.
+                ep.subtitlesText = text;
+                subTextarea.value = text;
                 dirty = true;
                 updateSubCount();
                 window.toast(`Subtitles loaded from "${f.name}"!`);
@@ -513,7 +568,7 @@
         const active = eps.filter(e => !e.deleted).length;
         $('cm-eps-title').textContent = `Episodes (${active})`;
         if (!eps.length) { box.append(el('div', 'text-sm text-white/40 py-4', 'No episodes yet. Click "Add Episode" to create one.')); return; }
-        
+
         const sortedEps = [...eps].sort((a, b) => {
             if (a.isNew && !b.isNew) return -1;
             if (!a.isNew && b.isNew) return 1;
@@ -527,7 +582,7 @@
         const existingNumbers = eps.map(e => e.number || 0);
         const next = existingNumbers.length ? Math.max(...existingNumbers) + 1 : 1;
         const defaultAuthor = $('cm-author').value.trim() || (book && book.author) || '';
-        
+
         const newEp = {
             id: null, isNew: true, deleted: false,
             number: next,
@@ -541,7 +596,7 @@
         };
 
         eps.unshift(newEp);
-        dirty = true; 
+        dirty = true;
         renderEpisodes();
         $('cm-eps').scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
@@ -624,7 +679,8 @@
             for (const e of eps) {
                 if (e.deleted) { if (e.id) batch.delete(fb.doc(fb.db, 'episodes', e.id)); continue; }
 
-                const segments = parseSubtitles(e.subtitlesText);
+                const parsed = parseSubtitles(e.subtitlesText);
+                const segments = parsed.segments;
                 const rawText = (e.subtitlesText || '').trim();
 
                 const fields = {
@@ -634,10 +690,12 @@
                     category: cats[0],
                     categories: cats,
                     episodeNumber: e.number,
-                    audioUrl: e.audioUrl,
+                    audioUrl: e.audioUrl || '',
                     coverUrl: e.coverUrl || bookCover,
                     teaserVideoUrl: e.removeTeaser ? '' : (e.teaserVideoUrl || ''),
-                    hasSubtitles: segments.length > 0
+                    transcriptText: rawText,
+                    hasSubtitles: segments.length > 0,
+                    subtitleMode: parsed.mode
                 };
 
                 if (e.isNew) {
@@ -700,12 +758,11 @@
     });
     $('cm-editor').addEventListener('input', () => { dirty = true; });
     $('cm-editor').addEventListener('change', () => { dirty = true; });
-    
-    if (typeof window.loadAudiobooks === 'function') {
-        window.loadAudiobooks().then(() => { window.renderContentList(); });
-    } else {
-        window.renderContentList();
-    }
+
+    // Works whether or not the dashboard defines loadAudiobooks.
+    Promise.resolve(typeof window.loadAudiobooks === 'function' ? window.loadAudiobooks() : null)
+        .catch(() => {})
+        .then(() => window.renderContentList());
 
     fb.getDocs(fb.collection(fb.db, 'audiobook_stats')).then(snap => {
         snap.forEach(d => { stats[d.id] = d.data(); });
