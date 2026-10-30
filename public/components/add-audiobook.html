@@ -125,6 +125,13 @@ async function publishAudiobook(event) {
         coverFile: block.querySelector('.ep-cover-file') ? block.querySelector('.ep-cover-file').files[0] : undefined
     }));
     if (!episodes.length) { alert('किमान एक एपिसोड जोडा.'); return; }
+    // Basic safety checks before spending time on uploads.
+    if (!coverFile.type.startsWith('image/') || coverFile.size > 5 * 1024 * 1024) { alert('कव्हर फक्त इमेज असावी आणि ५ MB पेक्षा लहान.'); return; }
+    for (const ep of episodes) {
+        if (ep.audioFile && (!ep.audioFile.type.startsWith('audio/') || ep.audioFile.size > 500 * 1024 * 1024)) { alert(`Episode ${ep.number}: ऑडिओ फाइल चुकीची किंवा ५०० MB पेक्षा मोठी आहे.`); return; }
+        if (ep.videoFile && (ep.videoFile.type !== 'video/mp4' || ep.videoFile.size > 200 * 1024 * 1024)) { alert(`Episode ${ep.number}: टीझर MP4 असावा आणि २०० MB पेक्षा लहान.`); return; }
+        if (ep.coverFile && (!ep.coverFile.type.startsWith('image/') || ep.coverFile.size > 5 * 1024 * 1024)) { alert(`Episode ${ep.number}: एपिसोड कव्हर इमेज ५ MB पेक्षा लहान असावी.`); return; }
+    }
     const missing = episodes.find(ep => !ep.audioFile);
     if (missing) { alert(`Episode ${missing.number} साठी ऑडिओ फाइल निवडा.`); return; }
 

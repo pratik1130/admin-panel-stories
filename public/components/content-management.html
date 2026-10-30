@@ -1,0 +1,715 @@
+<section class="space-y-6 max-w-5xl mx-auto">
+
+    <!-- ============ LIST VIEW ============ -->
+    <div id="cm-listview" class="space-y-6">
+        <div class="flex items-center justify-between border-b border-white/10 pb-4">
+            <div>
+                <h2 class="text-2xl font-bold">Content Management</h2>
+                <p class="text-xs text-white/50 mt-1">Manage all audiobooks in one place: search, edit, change visibility, or delete.</p>
+            </div>
+            <button onclick="switchTab('dashboard')" class="text-white/50 hover:text-white" aria-label="Close"><i class="fa-solid fa-xmark text-xl"></i></button>
+        </div>
+        <div class="flex flex-col sm:flex-row gap-3">
+            <input id="cm-search" type="search" placeholder="Search by title or author..." class="flex-1 bg-[#0B0F19] border border-white/20 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-cyan-400">
+            <select id="cm-filter" class="bg-[#0B0F19] border border-white/20 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-cyan-400">
+                <option value="all">All</option>
+                <option value="published">Published</option>
+                <option value="private">Private</option>
+                <option value="unlisted">Unlisted</option>
+                <option value="vip">VIP Premium</option>
+            </select>
+        </div>
+        <div id="cm-count" class="text-xs text-white/50"></div>
+        <div id="cm-list" class="space-y-3"></div>
+    </div>
+
+    <!-- ============ FULL EDITOR (opens when you press Edit) ============ -->
+    <div id="cm-editor" class="hidden space-y-6">
+        <div class="flex items-center justify-between border-b border-white/10 pb-4 gap-3">
+            <div class="min-w-0">
+                <button id="cm-back" class="text-xs text-cyan-300 hover:text-cyan-200 mb-1"><i class="fa-solid fa-arrow-left"></i> Back to all books</button>
+                <h2 class="text-2xl font-bold truncate" id="cm-editor-heading">Edit Audiobook</h2>
+            </div>
+            <button id="cm-save-top" class="px-5 py-2.5 rounded-xl bg-cyan-500 text-black text-sm font-bold shrink-0 disabled:opacity-50">Save All</button>
+        </div>
+
+        <!-- Book details -->
+        <div class="bg-[#131722] border border-white/10 rounded-2xl p-5 space-y-5">
+            <h3 class="font-bold text-cyan-300">Book Information</h3>
+            <div class="flex flex-col sm:flex-row gap-4">
+                <div class="shrink-0">
+                    <img id="cm-cover-preview" alt="" class="w-32 h-40 object-cover rounded-xl border border-white/10 bg-white/5">
+                    <label class="block mt-2 text-xs font-semibold text-cyan-300 cursor-pointer">
+                        <i class="fa-solid fa-image"></i> Change Cover
+                        <input id="cm-cover" type="file" accept="image/*" class="hidden">
+                    </label>
+                    <div id="cm-cover-name" class="text-[10px] text-white/40 max-w-[8rem] truncate"></div>
+                </div>
+                <div class="flex-1 space-y-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-white/70 mb-1">Book Title *</label>
+                        <input id="cm-title" type="text" placeholder="Enter book title..." class="w-full bg-[#0B0F19] border border-white/20 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-cyan-400">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-white/70 mb-1">Main Author / Narrator *</label>
+                        <input id="cm-author" type="text" placeholder="Enter author name..." class="w-full bg-[#0B0F19] border border-white/20 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-cyan-400">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-white/70 mb-1">Description / Synopsis</label>
+                        <textarea id="cm-desc" rows="3" placeholder="Enter book description..." class="w-full bg-[#0B0F19] border border-white/20 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-cyan-400"></textarea>
+                    </div>
+                </div>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs font-semibold text-white/70 mb-1">Language</label>
+                    <select id="cm-lang" class="w-full bg-[#0B0F19] border border-white/20 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-cyan-400">
+                        <option value="mr">Marathi (mr)</option><option value="hi">Hindi (hi)</option><option value="en">English (en)</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-white/70 mb-1">Visibility</label>
+                    <select id="cm-status" class="w-full bg-[#0B0F19] border border-white/20 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-cyan-400">
+                        <option value="published">Published</option><option value="private">Private</option><option value="unlisted">Unlisted</option>
+                    </select>
+                </div>
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-white/70 mb-2">Categories (Applies to all episodes)</label>
+                <div id="cm-cats" class="flex flex-wrap gap-2"></div>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <label class="flex items-center gap-3 p-3 bg-white/5 rounded-xl border border-white/10 text-sm cursor-pointer"><input id="cm-vip" type="checkbox" class="w-4 h-4"> VIP Premium Only</label>
+                <label class="flex items-center gap-3 p-3 bg-white/5 rounded-xl border border-white/10 text-sm cursor-pointer"><input id="cm-top" type="checkbox" class="w-4 h-4"> Top Series</label>
+            </div>
+        </div>
+
+        <!-- Episodes -->
+        <div class="bg-[#131722] border border-white/10 rounded-2xl p-5 space-y-4">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h3 class="font-bold text-cyan-300" id="cm-eps-title">Episodes</h3>
+                    <p class="text-[11px] text-white/40">New episodes will appear at the top for easy editing.</p>
+                </div>
+                <button id="cm-add-ep" class="px-4 py-2 rounded-full bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 text-sm font-bold border border-cyan-500/40"><i class="fa-solid fa-plus"></i> Add Episode</button>
+            </div>
+            <div id="cm-eps" class="space-y-4"></div>
+        </div>
+
+        <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+            <div id="cm-status-text" class="text-xs text-white/60"></div>
+            <div class="flex gap-3 justify-end">
+                <button id="cm-cancel" class="px-5 py-3 rounded-xl bg-white/10 text-sm font-semibold">Cancel</button>
+                <button id="cm-save" class="px-6 py-3 rounded-xl bg-cyan-500 text-black text-sm font-bold disabled:opacity-50">Save All</button>
+            </div>
+        </div>
+    </div>
+</section>
+
+<script>
+(function () {
+    const fb = window.fb;
+    const $ = id => document.getElementById(id);
+    const CATS = [['Popular','Popular'],['Trending','Trending'],['New','New & Hot'],['Horror','Horror'],['Thriller','Thriller'],['Suspense','Suspense'],['Romantic','Romantic'],['Education','Education']];
+    const MB = 1024 * 1024;
+    let stats = {};
+    let book = null;       
+    let eps = [];          
+    let coverFile = null;
+    let dirty = false;
+    let saving = false;
+
+    function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; }
+    const statusOf = b => b.publishingStatus || 'published';
+    const INPUT = 'w-full bg-[#0B0F19] border border-white/20 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-cyan-400';
+
+    function parseTime(t) {
+        if (typeof t === 'number') return t;
+        const p = String(t).trim().replace(',', '.').split(':').map(Number);
+        if (p.length === 3) return (p[0] * 3600) + (p[1] * 60) + p[2];
+        if (p.length === 2) return (p[0] * 60) + p[1];
+        return parseFloat(t) || 0;
+    }
+
+    function formatTime(sec) {
+        const s = Math.max(0, Math.floor(Number(sec) || 0));
+        const m = Math.floor(s / 60);
+        const r = s % 60;
+        return `${String(m).padStart(2, '0')}:${String(r).padStart(2, '0')}`;
+    }
+
+    function segmentsToText(segs) {
+        if (!Array.isArray(segs) || !segs.length) return '';
+        return segs.map(s => `${formatTime(s.start)} ${s.text || ''}`.trim()).join('\n');
+    }
+
+    function parseSubtitles(raw) {
+        const str = (raw || '').trim();
+        if (!str) return [];
+
+        if (str.startsWith('[')) {
+            try {
+                const arr = JSON.parse(str);
+                if (Array.isArray(arr)) {
+                    return arr.map((x, idx) => ({
+                        start: parseTime(x.start ?? x.startTime ?? idx * 5),
+                        end: parseTime(x.end ?? x.endTime ?? (parseTime(x.start ?? idx * 5) + 5)),
+                        text: String(x.text || '').trim()
+                    })).filter(x => x.text);
+                }
+            } catch (_) {}
+        }
+
+        if (str.includes('-->')) {
+            const blocks = str.replace(/\r\n/g, '\n').replace(/^WEBVTT[^\n]*\n+/i, '').split(/\n\s*\n/);
+            const out = [];
+            for (const b of blocks) {
+                const lines = b.trim().split('\n');
+                const arrowIdx = lines.findIndex(l => l.includes('-->'));
+                if (arrowIdx !== -1) {
+                    const times = lines[arrowIdx].split('-->');
+                    const start = parseTime(times[0]);
+                    const end = parseTime(times[1].split(' ')[0]);
+                    const text = lines.slice(arrowIdx + 1).join(' ').replace(/<[^>]+>/g, '').trim();
+                    if (text) out.push({ start, end: end > start ? end : start + 5, text });
+                }
+            }
+            if (out.length) return out;
+        }
+
+        const lines = str.replace(/\r\n/g, '\n').split('\n').map(l => l.trim()).filter(Boolean);
+        const temp = [];
+        lines.forEach((line, idx) => {
+            const m = line.match(/^(\d{1,2}:\d{2}(?::\d{2})?(?:[.,]\d{1,3})?)\s*(?:-\s*(\d{1,2}:\d{2}(?::\d{2})?(?:[.,]\d{1,3})?))?\s+(.+)$/);
+            if (m) {
+                temp.push({
+                    start: parseTime(m[1]),
+                    end: m[2] ? parseTime(m[2]) : null,
+                    text: m[3].trim()
+                });
+            } else {
+                const prevEnd = temp.length ? (temp[temp.length - 1].end || temp[temp.length - 1].start + 5) : idx * 5;
+                temp.push({ start: prevEnd, end: null, text: line });
+            }
+        });
+
+        for (let i = 0; i < temp.length; i++) {
+            if (temp[i].end === null || temp[i].end <= temp[i].start) {
+                temp[i].end = (i + 1 < temp.length && temp[i + 1].start > temp[i].start)
+                    ? temp[i + 1].start
+                    : temp[i].start + 5;
+            }
+        }
+        return temp;
+    }
+
+    /* ------------------------------------------------------------------ LIST */
+    window.renderContentList = function () {
+        const list = $('cm-list');
+        if (!list) return;
+        const q = $('cm-search').value.trim().toLowerCase();
+        const f = $('cm-filter').value;
+        const all = window.globalAudiobooks || [];
+        const books = all.filter(b => {
+            const hit = !q || (b.title || '').toLowerCase().includes(q) || (b.author || '').toLowerCase().includes(q);
+            const ok = f === 'all' || (f === 'vip' ? !!b.isPremium : statusOf(b) === f);
+            return hit && ok;
+        });
+        $('cm-count').textContent = `${books.length} / ${all.length} books`;
+        list.replaceChildren();
+        if (!books.length) { list.append(el('div', 'text-sm text-white/40 py-8 text-center', 'No books found.')); return; }
+
+        books.forEach(b => {
+            const row = el('div', 'bg-[#0B0F19] border border-white/10 rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center gap-3');
+            const left = el('div', 'flex items-center gap-3 flex-1 min-w-0');
+            const img = el('img', 'w-12 h-14 object-cover rounded-lg border border-white/10 bg-white/5');
+            img.alt = ''; if (b.coverUrl) img.src = b.coverUrl;
+            const info = el('div', 'min-w-0');
+            info.append(el('div', 'text-sm font-bold text-white truncate', b.title || '(Untitled)'));
+            info.append(el('div', 'text-xs text-white/40 truncate', `${b.author || ''} • ${(b.categories || [b.category]).filter(Boolean).join(', ')}`));
+            const tags = el('div', 'flex flex-wrap gap-1.5 mt-1');
+            if (b.isPremium) tags.append(el('span', 'px-2 py-0.5 bg-yellow-500/20 text-yellow-300 text-[10px] font-bold rounded-full', 'VIP'));
+            if (b.isTopSeries) tags.append(el('span', 'px-2 py-0.5 bg-purple-500/20 text-purple-300 text-[10px] font-bold rounded-full', 'TOP SERIES'));
+            const listens = stats[b.id] && typeof stats[b.id].listenCount === 'number' ? stats[b.id].listenCount : 0;
+            tags.append(el('span', 'px-2 py-0.5 bg-white/10 text-white/60 text-[10px] font-bold rounded-full', `${listens} listens`));
+            info.append(tags);
+            left.append(img, info);
+
+            const actions = el('div', 'flex items-center gap-2');
+            const sel = el('select', 'bg-[#131722] border border-white/20 rounded-lg px-2 py-2 text-xs text-white');
+            [['published', 'Published'], ['private', 'Private'], ['unlisted', 'Unlisted']].forEach(([v, l]) => { const o = el('option', '', l); o.value = v; if (statusOf(b) === v) o.selected = true; sel.append(o); });
+            sel.addEventListener('change', async () => {
+                try { await fb.updateDoc(fb.doc(fb.db, 'audiobooks', b.id), { publishingStatus: sel.value }); window.toast('Visibility updated.'); }
+                catch (e) { window.toast('Update failed: ' + e.message, 'error'); }
+            });
+            const edit = el('button', 'px-3 py-2 rounded-lg bg-cyan-500/20 text-cyan-300 text-xs font-bold'); edit.innerHTML = '<i class="fa-solid fa-pen"></i> Edit';
+            edit.addEventListener('click', () => openEditor(b));
+            const del = el('button', 'px-3 py-2 rounded-lg bg-red-500/15 text-red-400 text-xs font-bold'); del.innerHTML = '<i class="fa-solid fa-trash"></i>';
+            del.setAttribute('aria-label', 'Delete');
+            del.addEventListener('click', () => deleteBook(b));
+            actions.append(sel, edit, del);
+            row.append(left, actions);
+            list.append(row);
+        });
+    };
+
+    async function deleteBook(b) {
+        if (!confirm(`Permanently delete "${b.title}" and all its episodes? This cannot be undone.`)) return;
+        try {
+            await window.requireAdmin();
+            const batch = fb.writeBatch(fb.db);
+            for (const name of ['episodes', 'transcripts']) {
+                const snap = await fb.getDocs(fb.query(fb.collection(fb.db, name), fb.where('audiobookId', '==', b.id)));
+                snap.forEach(d => batch.delete(d.ref));
+            }
+            batch.delete(fb.doc(fb.db, 'audiobook_stats', b.id));
+            batch.delete(fb.doc(fb.db, 'audiobooks', b.id));
+            await batch.commit();
+            window.toast('Book deleted successfully.');
+        } catch (e) { window.toast('Delete failed: ' + e.message, 'error'); }
+    }
+
+    /* ---------------------------------------------------------------- EDITOR */
+    function buildCategoryBoxes() {
+        const box = $('cm-cats'); box.replaceChildren();
+        CATS.forEach(([v, l]) => {
+            const lab = el('label', 'flex items-center gap-2 bg-[#0B0F19] border border-white/10 px-3 py-2 rounded-xl cursor-pointer text-sm');
+            const cb = document.createElement('input'); cb.type = 'checkbox'; cb.value = v; cb.className = 'cm-cat w-4 h-4';
+            lab.append(cb, el('span', '', l)); box.append(lab);
+        });
+    }
+
+    function showList() { $('cm-editor').classList.add('hidden'); $('cm-listview').classList.remove('hidden'); book = null; eps = []; coverFile = null; dirty = false; if (typeof window.loadAudiobooks === 'function') window.loadAudiobooks(); }
+
+    function leaveEditor() {
+        if (saving) return;
+        if (dirty && !confirm('Discard unsaved changes?')) return;
+        showList();
+    }
+
+    async function openEditor(b) {
+        book = b; coverFile = null; dirty = false; eps = [];
+        $('cm-editor-heading').textContent = b.title || 'Edit Audiobook';
+        $('cm-title').value = b.title || ''; $('cm-author').value = b.author || ''; $('cm-desc').value = b.synopsis || '';
+        $('cm-lang').value = b.language || 'mr'; $('cm-status').value = statusOf(b);
+        $('cm-vip').checked = !!b.isPremium; $('cm-top').checked = !!b.isTopSeries;
+        $('cm-cover').value = ''; $('cm-cover-name').textContent = '';
+        if (b.coverUrl) $('cm-cover-preview').src = b.coverUrl; else $('cm-cover-preview').removeAttribute('src');
+        const cur = b.categories || (b.category ? [b.category] : []);
+        document.querySelectorAll('.cm-cat').forEach(cb => { cb.checked = cur.includes(cb.value); });
+        $('cm-status-text').textContent = '';
+        $('cm-listview').classList.add('hidden');
+        $('cm-editor').classList.remove('hidden');
+        window.scrollTo({ top: 0 });
+
+        $('cm-eps').replaceChildren(el('div', 'text-sm text-white/50 py-4', 'Loading episodes and subtitles...'));
+        try {
+            const [epSnap, trSnap] = await Promise.all([
+                fb.getDocs(fb.query(fb.collection(fb.db, 'episodes'), fb.where('audiobookId', '==', b.id))),
+                fb.getDocs(fb.query(fb.collection(fb.db, 'transcripts'), fb.where('audiobookId', '==', b.id)))
+            ]);
+            if (!book || book.id !== b.id) return;
+
+            const trByEp = {};
+            trSnap.docs.forEach(d => {
+                const td = d.data();
+                if (td.episodeId) trByEp[td.episodeId] = { id: d.id, segments: td.segments || [], rawText: td.rawText || '' };
+            });
+
+            eps = epSnap.docs.map(d => {
+                const x = d.data();
+                const tr = trByEp[d.id];
+                const subText = tr ? (tr.rawText || segmentsToText(tr.segments)) : (x.subtitlesText || '');
+                return {
+                    id: d.id, isNew: false, deleted: false,
+                    number: x.episodeNumber || 0,
+                    title: x.title || '',
+                    author: x.author || b.author || '',
+                    description: x.description || x.synopsis || '',
+                    subtitlesText: subText,
+                    transcriptId: tr ? tr.id : null,
+                    audioUrl: x.audioUrl || '', coverUrl: x.coverUrl || '', teaserVideoUrl: x.teaserVideoUrl || '',
+                    audioFile: null, coverFile: null, videoFile: null, removeTeaser: false
+                };
+            }).sort((a, c) => a.number - c.number);
+            renderEpisodes();
+        } catch (e) {
+            $('cm-eps').replaceChildren(el('div', 'text-sm text-red-400 py-4', 'Failed to load episodes: ' + e.message));
+        }
+    }
+
+    function fileField(labelText, accept, onPick) {
+        const wrap = el('div', 'space-y-1');
+        wrap.append(el('div', 'text-[11px] font-semibold text-white/60', labelText));
+        const lab = el('label', 'block p-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-center text-xs text-cyan-300 cursor-pointer truncate');
+        const name = el('span', '', 'Choose / Change file');
+        const input = document.createElement('input'); input.type = 'file'; input.accept = accept; input.className = 'hidden';
+        input.addEventListener('change', () => { const f = input.files[0] || null; onPick(f); name.textContent = f ? f.name : 'Choose / Change file'; dirty = true; });
+        lab.append(name, input); wrap.append(lab);
+        return wrap;
+    }
+
+    function episodeCard(ep) {
+        if (ep.deleted) {
+            const row = el('div', 'flex items-center justify-between bg-red-500/10 border border-red-500/30 rounded-xl p-3');
+            row.append(el('div', 'text-sm text-red-300', `Episode ${ep.number}: ${ep.title || ''} — Will be deleted on save`));
+            const undo = el('button', 'px-3 py-1.5 rounded-lg bg-white/10 text-xs font-bold', 'Undo');
+            undo.addEventListener('click', () => { ep.deleted = false; renderEpisodes(); });
+            row.append(undo); return row;
+        }
+        const card = el('div', 'bg-[#0B0F19] border ' + (ep.isNew ? 'border-emerald-500/50 shadow-lg shadow-emerald-500/10' : 'border-white/10') + ' rounded-2xl p-4 space-y-4');
+
+        const topBar = el('div', 'flex items-center justify-between border-b border-white/10 pb-2.5 gap-2');
+        const badgeWrap = el('div', 'flex items-center gap-2 min-w-0');
+        const epHeading = el('span', 'text-sm font-bold text-cyan-300 truncate', `Episode #${ep.number || '?'}${ep.title ? ' — ' + ep.title : ' (New Episode - Enter title below)'}`);
+        badgeWrap.append(epHeading);
+        if (ep.isNew) badgeWrap.append(el('span', 'px-2 py-0.5 bg-emerald-500/20 text-emerald-300 text-[10px] font-bold rounded-full shrink-0 animate-pulse', 'NEW'));
+
+        const del = el('button', 'w-8 h-8 rounded-lg bg-red-500/15 hover:bg-red-500/25 text-red-400 shrink-0 flex items-center justify-center');
+        del.innerHTML = '<i class="fa-solid fa-trash text-xs"></i>';
+        del.setAttribute('aria-label', 'Delete episode');
+        del.addEventListener('click', () => {
+            if (ep.isNew) { eps = eps.filter(x => x !== ep); } else { ep.deleted = true; }
+            dirty = true; renderEpisodes();
+        });
+        topBar.append(badgeWrap, del);
+        card.append(topBar);
+
+        function refreshHeading() {
+            epHeading.textContent = `Episode #${ep.number || '?'}${ep.title.trim() ? ' — ' + ep.title.trim() : ' (New Episode - Enter title below)'}`;
+        }
+
+        const infoGrid = el('div', 'grid grid-cols-1 sm:grid-cols-12 gap-3');
+
+        const numWrap = el('div', 'sm:col-span-2 space-y-1');
+        numWrap.append(el('label', 'block text-[11px] font-semibold text-white/70', 'Ep. No. *'));
+        const num = document.createElement('input');
+        num.type = 'number'; num.min = '1'; num.value = ep.number;
+        num.className = INPUT + ' text-center font-bold text-cyan-300';
+        num.addEventListener('input', () => { ep.number = parseInt(num.value, 10) || 0; dirty = true; refreshHeading(); });
+        numWrap.append(num);
+
+        const titleWrap = el('div', 'sm:col-span-5 space-y-1');
+        titleWrap.append(el('label', 'block text-[11px] font-semibold text-white/70', 'Episode Title *'));
+        const title = document.createElement('input');
+        title.type = 'text';
+        title.placeholder = 'e.g. Part 1: Mystery House...';
+        title.value = ep.title;
+        title.className = INPUT;
+        title.addEventListener('input', () => { ep.title = title.value; dirty = true; refreshHeading(); });
+        titleWrap.append(title);
+
+        const authorWrap = el('div', 'sm:col-span-5 space-y-1');
+        authorWrap.append(el('label', 'block text-[11px] font-semibold text-white/70', 'Author / Narrator *'));
+        const authorInput = document.createElement('input');
+        authorInput.type = 'text';
+        authorInput.placeholder = 'Author or narrator name...';
+        authorInput.value = ep.author || '';
+        authorInput.className = INPUT;
+        authorInput.addEventListener('input', () => { ep.author = authorInput.value; dirty = true; });
+        authorWrap.append(authorInput);
+
+        infoGrid.append(numWrap, titleWrap, authorWrap);
+        card.append(infoGrid);
+
+        const descWrap = el('div', 'space-y-1');
+        descWrap.append(el('label', 'block text-[11px] font-semibold text-white/70', 'Episode Description'));
+        const descInput = document.createElement('textarea');
+        descInput.rows = 2;
+        descInput.placeholder = 'Short description of this episode...';
+        descInput.value = ep.description || '';
+        descInput.className = INPUT;
+        descInput.addEventListener('input', () => { ep.description = descInput.value; dirty = true; });
+        descWrap.append(descInput);
+        card.append(descWrap);
+
+        const grid = el('div', 'grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-white/5');
+
+        const a = el('div', 'space-y-2');
+        if (ep.audioUrl) { const player = document.createElement('audio'); player.controls = true; player.preload = 'none'; player.src = ep.audioUrl; player.className = 'w-full h-9'; a.append(el('div', 'text-[11px] font-semibold text-white/60', 'Current Audio'), player); }
+        a.append(fileField(ep.isNew ? 'Audio File (Required) *' : 'Change Audio (Optional)', 'audio/*', f => { ep.audioFile = f; }));
+        grid.append(a);
+
+        const t = el('div', 'space-y-2');
+        t.append(el('div', 'text-[11px] font-semibold text-white/60', ep.teaserVideoUrl ? 'Teaser Video: Attached' : 'Teaser Video: None'));
+        if (ep.teaserVideoUrl) {
+            const lab = el('label', 'flex items-center gap-2 text-xs text-white/70 cursor-pointer');
+            const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = ep.removeTeaser;
+            cb.addEventListener('change', () => { ep.removeTeaser = cb.checked; dirty = true; });
+            lab.append(cb, el('span', '', 'Remove teaser')); t.append(lab);
+        }
+        t.append(fileField(ep.teaserVideoUrl ? 'Change Teaser (MP4)' : 'Add Teaser (MP4, Optional)', 'video/mp4', f => { ep.videoFile = f; }));
+        grid.append(t);
+
+        const c = el('div', 'space-y-2');
+        const thumb = el('img', 'w-16 h-16 object-cover rounded-lg border border-white/10 bg-white/5'); thumb.alt = '';
+        if (ep.coverUrl) thumb.src = ep.coverUrl;
+        c.append(el('div', 'text-[11px] font-semibold text-white/60', 'Episode Cover'), thumb);
+        c.append(fileField('Change Cover (Optional)', 'image/*', f => { ep.coverFile = f; if (f) thumb.src = URL.createObjectURL(f); }));
+        grid.append(c);
+
+        card.append(grid);
+
+        const subBox = el('div', 'space-y-2 pt-3 border-t border-white/10');
+        const subHead = el('div', 'flex flex-col sm:flex-row sm:items-center justify-between gap-2');
+        const subTitleWrap = el('div', '');
+        subTitleWrap.append(
+            el('div', 'text-xs font-bold text-cyan-300', 'Subtitles / Transcript'),
+            el('div', 'text-[11px] text-white/40', 'Format: "00:05 Your sentence" per line, or upload a .srt / .vtt file.')
+        );
+
+        const subFileLabel = el('label', 'px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/15 rounded-lg text-xs text-cyan-300 cursor-pointer shrink-0 inline-flex items-center gap-1.5 self-start');
+        subFileLabel.innerHTML = '<i class="fa-solid fa-closed-captioning"></i> Choose subtitle file (.srt/.vtt/.txt)';
+        const subFileInput = document.createElement('input');
+        subFileInput.type = 'file';
+        subFileInput.accept = '.srt,.vtt,.txt,.json,text/plain';
+        subFileInput.className = 'hidden';
+
+        const subTextarea = document.createElement('textarea');
+        subTextarea.rows = 4;
+        subTextarea.placeholder = 'e.g.\n00:00 It was a dark night...\n00:05 Someone knocked on the door.';
+        subTextarea.value = ep.subtitlesText || '';
+        subTextarea.className = INPUT + ' font-mono text-xs';
+
+        const subCount = el('div', 'text-[11px] text-white/40', '');
+        function updateSubCount() {
+            const segs = parseSubtitles(ep.subtitlesText);
+            subCount.textContent = segs.length ? `✓ ${segs.length} subtitle lines ready for audio sync.` : 'No subtitles added yet.';
+        }
+        updateSubCount();
+
+        subTextarea.addEventListener('input', () => {
+            ep.subtitlesText = subTextarea.value;
+            dirty = true;
+            updateSubCount();
+        });
+
+        subFileInput.addEventListener('change', async () => {
+            const f = subFileInput.files[0];
+            if (!f) return;
+            try {
+                const text = await f.text();
+                const parsed = parseSubtitles(text);
+                ep.subtitlesText = parsed.length ? segmentsToText(parsed) : text;
+                subTextarea.value = ep.subtitlesText;
+                dirty = true;
+                updateSubCount();
+                window.toast(`Subtitles loaded from "${f.name}"!`);
+            } catch (err) {
+                window.toast('Failed to read subtitle file: ' + err.message, 'error');
+            }
+        });
+
+        subFileLabel.append(subFileInput);
+        subHead.append(subTitleWrap, subFileLabel);
+        subBox.append(subHead, subTextarea, subCount);
+        card.append(subBox);
+
+        return card;
+    }
+
+    function renderEpisodes() {
+        const box = $('cm-eps'); box.replaceChildren();
+        const active = eps.filter(e => !e.deleted).length;
+        $('cm-eps-title').textContent = `Episodes (${active})`;
+        if (!eps.length) { box.append(el('div', 'text-sm text-white/40 py-4', 'No episodes yet. Click "Add Episode" to create one.')); return; }
+        
+        const sortedEps = [...eps].sort((a, b) => {
+            if (a.isNew && !b.isNew) return -1;
+            if (!a.isNew && b.isNew) return 1;
+            return a.number - b.number;
+        });
+
+        sortedEps.forEach(ep => box.append(episodeCard(ep)));
+    }
+
+    function addEpisode() {
+        const existingNumbers = eps.map(e => e.number || 0);
+        const next = existingNumbers.length ? Math.max(...existingNumbers) + 1 : 1;
+        const defaultAuthor = $('cm-author').value.trim() || (book && book.author) || '';
+        
+        const newEp = {
+            id: null, isNew: true, deleted: false,
+            number: next,
+            title: '',
+            author: defaultAuthor,
+            description: '',
+            subtitlesText: '',
+            transcriptId: null,
+            audioUrl: '', coverUrl: '', teaserVideoUrl: '',
+            audioFile: null, coverFile: null, videoFile: null, removeTeaser: false
+        };
+
+        eps.unshift(newEp);
+        dirty = true; 
+        renderEpisodes();
+        $('cm-eps').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    /* ------------------------------------------------------------------ SAVE */
+    function setBusy(on, text) {
+        saving = on;
+        ['cm-save', 'cm-save-top', 'cm-cancel', 'cm-back', 'cm-add-ep'].forEach(id => { const b = $(id); if (b) b.disabled = on; });
+        $('cm-save').textContent = on ? 'Saving...' : 'Save All';
+        $('cm-save-top').textContent = on ? 'Saving...' : 'Save All';
+        $('cm-status-text').textContent = text || '';
+    }
+
+    function validate() {
+        const title = $('cm-title').value.trim(), author = $('cm-author').value.trim();
+        const cats = [...document.querySelectorAll('.cm-cat:checked')].map(c => c.value);
+        if (!title || !author) return 'Book title and main author are required.';
+        if (!cats.length) return 'Please select at least one category.';
+        if (coverFile && (!coverFile.type.startsWith('image/') || coverFile.size > 5 * MB)) return 'Cover image must be an image under 5 MB.';
+        const active = eps.filter(e => !e.deleted);
+        const seen = new Set();
+        for (const e of active) {
+            if (!Number.isInteger(e.number) || e.number < 1) return `Episode "${e.title || '?'}": Number must be 1 or greater.`;
+            if (seen.has(e.number)) return `Episode number ${e.number} is duplicated. Each episode must have a unique number.`;
+            seen.add(e.number);
+            if (!e.title.trim()) return `Episode ${e.number}: Title is required.`;
+            if (e.isNew && !e.audioFile) return `Episode ${e.number}: Audio file is required.`;
+            if (e.audioFile && (!e.audioFile.type.startsWith('audio/') || e.audioFile.size > 500 * MB)) return `Episode ${e.number}: Audio invalid or larger than 500 MB.`;
+            if (e.videoFile && (e.videoFile.type !== 'video/mp4' || e.videoFile.size > 200 * MB)) return `Episode ${e.number}: Teaser must be MP4 under 200 MB.`;
+            if (e.coverFile && (!e.coverFile.type.startsWith('image/') || e.coverFile.size > 5 * MB)) return `Episode ${e.number}: Cover image must be under 5 MB.`;
+        }
+        return '';
+    }
+
+    async function saveAll() {
+        if (saving || !book) return;
+        const problem = validate();
+        if (problem) { window.toast(problem, 'error'); return; }
+        const bookId = book.id;
+        delete book._newCover;
+        try {
+            setBusy(true, 'Checking files...');
+            await window.requireAdmin();
+
+            const jobs = [];
+            if (coverFile) jobs.push({ label: 'Book Cover', file: coverFile, folder: 'covers', done: url => { book._newCover = url; } });
+            eps.filter(e => !e.deleted).forEach(e => {
+                if (e.audioFile) jobs.push({ label: `Ep ${e.number} Audio`, file: e.audioFile, folder: 'episodes', done: url => { e.audioUrl = url; } });
+                if (e.videoFile) jobs.push({ label: `Ep ${e.number} Teaser`, file: e.videoFile, folder: 'teasers', done: url => { e.teaserVideoUrl = url; e.removeTeaser = false; } });
+                if (e.coverFile) jobs.push({ label: `Ep ${e.number} Cover`, file: e.coverFile, folder: 'covers', done: url => { e.coverUrl = url; } });
+            });
+            for (let i = 0; i < jobs.length; i++) {
+                const j = jobs[i];
+                const url = await window.uploadFile(j.file, j.folder, p => setBusy(true, `Uploading ${i + 1}/${jobs.length}: ${j.label} ${p}%`));
+                j.done(url);
+            }
+
+            setBusy(true, 'Saving to database...');
+            const doomed = [];
+            for (const e of eps.filter(x => x.deleted && x.id)) {
+                const snap = await fb.getDocs(fb.query(fb.collection(fb.db, 'transcripts'), fb.where('episodeId', '==', e.id)));
+                snap.forEach(d => doomed.push(d.ref));
+            }
+
+            const batch = fb.writeBatch(fb.db);
+            const cats = [...document.querySelectorAll('.cm-cat:checked')].map(c => c.value);
+            const language = $('cm-lang').value;
+            const bookAuthor = $('cm-author').value.trim();
+            const active = eps.filter(e => !e.deleted).sort((a, c) => a.number - c.number);
+            const payload = {
+                title: $('cm-title').value.trim(), author: bookAuthor, synopsis: $('cm-desc').value.trim(),
+                language, category: cats[0], categories: cats, isPremium: $('cm-vip').checked, isTopSeries: $('cm-top').checked,
+                publishingStatus: $('cm-status').value
+            };
+            if (book._newCover) payload.coverUrl = book._newCover;
+            if (active.length && active[0].audioUrl) payload.audioUrl = active[0].audioUrl;
+            batch.update(fb.doc(fb.db, 'audiobooks', bookId), payload);
+
+            const bookCover = payload.coverUrl || book.coverUrl || '';
+            for (const e of eps) {
+                if (e.deleted) { if (e.id) batch.delete(fb.doc(fb.db, 'episodes', e.id)); continue; }
+
+                const segments = parseSubtitles(e.subtitlesText);
+                const rawText = (e.subtitlesText || '').trim();
+
+                const fields = {
+                    title: e.title.trim(),
+                    author: (e.author || '').trim() || bookAuthor,
+                    description: (e.description || '').trim(),
+                    category: cats[0],
+                    categories: cats,
+                    episodeNumber: e.number,
+                    audioUrl: e.audioUrl,
+                    coverUrl: e.coverUrl || bookCover,
+                    teaserVideoUrl: e.removeTeaser ? '' : (e.teaserVideoUrl || ''),
+                    hasSubtitles: segments.length > 0
+                };
+
+                if (e.isNew) {
+                    const epRef = fb.doc(fb.collection(fb.db, 'episodes'));
+                    batch.set(epRef, { ...fields, audiobookId: bookId, createdAt: fb.serverTimestamp() });
+                    batch.set(fb.doc(fb.collection(fb.db, 'transcripts')), {
+                        audiobookId: bookId,
+                        episodeId: epRef.id,
+                        language,
+                        segments,
+                        rawText,
+                        createdAt: fb.serverTimestamp()
+                    });
+                } else {
+                    batch.update(fb.doc(fb.db, 'episodes', e.id), fields);
+                    if (e.transcriptId) {
+                        batch.update(fb.doc(fb.db, 'transcripts', e.transcriptId), {
+                            language,
+                            segments,
+                            rawText,
+                            updatedAt: fb.serverTimestamp()
+                        });
+                    } else {
+                        batch.set(fb.doc(fb.collection(fb.db, 'transcripts')), {
+                            audiobookId: bookId,
+                            episodeId: e.id,
+                            language,
+                            segments,
+                            rawText,
+                            createdAt: fb.serverTimestamp()
+                        });
+                    }
+                }
+            }
+            doomed.forEach(r => batch.delete(r));
+            await batch.commit();
+
+            window.toast('All changes and subtitles saved successfully!');
+            dirty = false; setBusy(false, ''); showList();
+        } catch (e) {
+            console.error('Save failed:', e);
+            setBusy(false, '');
+            window.toast('Save failed: ' + e.message, 'error');
+        }
+    }
+
+    /* ------------------------------------------------------------------ INIT */
+    buildCategoryBoxes();
+    $('cm-search').addEventListener('input', window.renderContentList);
+    $('cm-filter').addEventListener('change', window.renderContentList);
+    $('cm-back').addEventListener('click', leaveEditor);
+    $('cm-cancel').addEventListener('click', leaveEditor);
+    $('cm-save').addEventListener('click', saveAll);
+    $('cm-save-top').addEventListener('click', saveAll);
+    $('cm-add-ep').addEventListener('click', addEpisode);
+    $('cm-cover').addEventListener('change', e => {
+        coverFile = e.target.files[0] || null; dirty = true;
+        $('cm-cover-name').textContent = coverFile ? coverFile.name : '';
+        if (coverFile) $('cm-cover-preview').src = URL.createObjectURL(coverFile);
+    });
+    $('cm-editor').addEventListener('input', () => { dirty = true; });
+    $('cm-editor').addEventListener('change', () => { dirty = true; });
+    
+    if (typeof window.loadAudiobooks === 'function') {
+        window.loadAudiobooks().then(() => { window.renderContentList(); });
+    } else {
+        window.renderContentList();
+    }
+
+    fb.getDocs(fb.collection(fb.db, 'audiobook_stats')).then(snap => {
+        snap.forEach(d => { stats[d.id] = d.data(); });
+        window.renderContentList();
+    }).catch(() => {});
+})();
+</script>

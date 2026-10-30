@@ -15,6 +15,7 @@
             <nav class="space-y-1.5" aria-label="Admin sections">
                 <button onclick="switchTab('dashboard')" id="nav-dashboard" class="nav-item w-full flex items-center gap-3 px-4 py-2.5 rounded-xl bg-cyan-500/20 text-cyan-300 font-semibold text-sm transition-all"><i class="fa-solid fa-chart-pie w-5"></i> Dashboard</button>
                 <button onclick="switchTab('upload')" id="nav-upload" class="nav-item w-full flex items-center gap-3 px-4 py-2.5 rounded-xl hover:bg-white/5 text-white/70 hover:text-white font-semibold text-sm transition-all"><i class="fa-solid fa-cloud-arrow-up w-5"></i> Add Audiobook</button>
+                <button onclick="switchTab('content')" id="nav-content" class="nav-item w-full flex items-center gap-3 px-4 py-2.5 rounded-xl hover:bg-white/5 text-white/70 hover:text-white font-semibold text-sm transition-all"><i class="fa-solid fa-folder-open w-5"></i> Content Management</button>
                 <button onclick="switchTab('login_bg')" id="nav-login_bg" class="nav-item w-full flex items-center gap-3 px-4 py-2.5 rounded-xl hover:bg-white/5 text-white/70 hover:text-white font-semibold text-sm transition-all"><i class="fa-solid fa-image w-5"></i> Login Screen BG</button>
                 <button onclick="switchTab('coupons')" id="nav-coupons" class="nav-item w-full flex items-center gap-3 px-4 py-2.5 rounded-xl hover:bg-white/5 text-white/70 hover:text-white font-semibold text-sm transition-all"><i class="fa-solid fa-tags w-5"></i> Coupons & Offers</button>
                 <button onclick="switchTab('trending')" id="nav-trending" class="nav-item w-full flex items-center gap-3 px-4 py-2.5 rounded-xl hover:bg-white/5 text-white/70 hover:text-white font-semibold text-sm transition-all"><i class="fa-solid fa-fire w-5"></i> Trending Carousel</button>
@@ -48,7 +49,7 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/13.1.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/13.1.0/firebase-auth.js";
-import { getFirestore, collection, doc, writeBatch, onSnapshot, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js";
+import { getFirestore, collection, doc, writeBatch, onSnapshot, query, orderBy, where, serverTimestamp, getDocs, getDoc, setDoc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js";
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/13.1.0/firebase-storage.js";
 
 const firebaseConfig = {
@@ -68,13 +69,44 @@ const db = getFirestore(app, FIRESTORE_DATABASE_ID);
 const storage = getStorage(app);
 
 // Helpers used by the section files in /components (they are plain scripts).
-window.fb = { auth, db, storage, collection, doc, writeBatch, serverTimestamp, ref, uploadBytesResumable, getDownloadURL };
+window.fb = { auth, db, storage, collection, doc, writeBatch, serverTimestamp, ref, uploadBytesResumable, getDownloadURL, query, where, orderBy, getDocs, getDoc, setDoc, updateDoc, deleteDoc };
+
+// Small toast notifications used by every section.
+window.toast = function(message, kind) {
+    let box = document.getElementById('toast-box');
+    if (!box) {
+        box = document.createElement('div');
+        box.id = 'toast-box';
+        box.className = 'fixed bottom-5 right-5 z-50 flex flex-col gap-2';
+        document.body.appendChild(box);
+    }
+    const item = document.createElement('div');
+    const color = kind === 'error' ? 'bg-red-600' : kind === 'info' ? 'bg-slate-600' : 'bg-emerald-600';
+    item.className = `${color} text-white text-sm font-semibold px-4 py-3 rounded-xl shadow-lg max-w-xs`;
+    item.textContent = message;
+    box.appendChild(item);
+    setTimeout(() => item.remove(), 4500);
+};
+
+// Uploads a file to Storage and resolves with its public download URL.
+window.uploadFile = function(file, folder, onProgress) {
+    const safeName = file.name.replace(/[^\w.\-]+/g, '_');
+    const path = `${folder}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}_${safeName}`;
+    const task = uploadBytesResumable(ref(storage, path), file, { contentType: file.type || undefined });
+    return new Promise((resolve, reject) => {
+        task.on('state_changed',
+            snap => onProgress && onProgress(Math.round((snap.bytesTransferred / snap.totalBytes) * 100)),
+            reject,
+            async () => { try { resolve(await getDownloadURL(task.snapshot.ref)); } catch (e) { reject(e); } });
+    });
+};
 window.globalAudiobooks = [];
 window.globalUsers = {};
 let activeComponent = null;
 
 const componentFiles = {
     upload: 'components/add-audiobook.html',
+    content: 'components/content-management.html',
     login_bg: 'components/login-bg.html',
     coupons: 'components/coupons.html',
     trending: 'components/trending.html',
@@ -195,6 +227,7 @@ function fetchFirebaseData() {
         renderDashboardAudiobooks(document.getElementById('firebase-audiobooks-list'));
         if (typeof window.renderTrending === 'function' && activeComponent === 'trending') window.renderTrending();
         if (typeof window.loadSectionBooks === 'function' && activeComponent === 'section_ordering') window.loadSectionBooks();
+        if (typeof window.renderContentList === 'function' && activeComponent === 'content') window.renderContentList();
     }, showDatabaseError);
 
     onSnapshot(collection(db, 'users'), snapshot => {

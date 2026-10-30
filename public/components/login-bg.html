@@ -1,4 +1,74 @@
-<section class="space-y-6 max-w-4xl mx-auto">
-    <div class="flex items-center justify-between border-b border-white/10 pb-4"><h2 class="text-2xl font-bold">Login Screen Background Manager</h2><button onclick="switchTab('dashboard')" class="text-white/50 hover:text-white" aria-label="Close"><i class="fa-solid fa-xmark text-xl"></i></button></div>
-    <div class="bg-[#131722] border border-white/10 p-6 rounded-2xl shadow-xl space-y-4"><input type="file" id="login-bg-file" accept="image/*" class="w-full bg-[#0B0F19] border border-white/20 rounded-xl p-3 text-sm text-white"><button type="button" onclick="alert('Login BG Synced!')" class="px-6 py-3 bg-blue-600 text-white font-bold rounded-xl text-sm">Save & Publish</button></div>
+<section class="space-y-6 max-w-3xl mx-auto">
+    <div class="flex items-center justify-between border-b border-white/10 pb-4">
+        <div>
+            <h2 class="text-2xl font-bold">Login Screen Background Manager</h2>
+            <p class="text-xs text-white/50 mt-1">अ‍ॅपच्या लॉगिन स्क्रीनचा फोटो किंवा व्हिडिओ (५० MB पर्यंत).</p>
+        </div>
+        <button onclick="switchTab('dashboard')" class="text-white/50 hover:text-white" aria-label="Close"><i class="fa-solid fa-xmark text-xl"></i></button>
+    </div>
+    <div class="bg-[#0B0F19] border border-white/10 rounded-2xl p-5 space-y-4">
+        <div>
+            <div class="text-xs font-semibold text-white/70 mb-2">सध्याचं / निवडलेलं बॅकग्राउंड</div>
+            <div id="lb-preview" class="w-full h-56 rounded-xl border border-dashed border-white/20 bg-white/5 flex items-center justify-center text-xs text-white/40 overflow-hidden">अजून काही सेट केलेलं नाही (डीफॉल्ट वापरलं जातं)</div>
+        </div>
+        <input id="lb-file" type="file" accept="image/*,video/mp4,video/webm" class="text-xs text-white/70">
+        <div id="lb-progress-wrap" class="hidden w-full h-2 bg-white/10 rounded-full overflow-hidden"><div id="lb-progress" class="h-2 bg-cyan-400" style="width:0%"></div></div>
+        <div class="flex flex-wrap gap-3">
+            <button id="lb-save" class="px-5 py-3 rounded-xl bg-cyan-500 text-black text-sm font-bold disabled:opacity-40">Save &amp; Publish</button>
+            <button id="lb-reset" class="px-5 py-3 rounded-xl bg-white/10 text-sm font-semibold">डीफॉल्टवर परत जा</button>
+        </div>
+    </div>
 </section>
+<script>
+(function () {
+    const fb = window.fb;
+    const $ = id => document.getElementById(id);
+    const settingsRef = () => fb.doc(fb.db, 'appSettings', 'loginBackground');
+    let pending = null;
+
+    function show(url, type) {
+        const box = $('lb-preview'); box.replaceChildren();
+        let node;
+        if (type === 'video') { node = document.createElement('video'); node.src = url; node.muted = true; node.loop = true; node.autoplay = true; node.playsInline = true; }
+        else { node = document.createElement('img'); node.src = url; node.alt = ''; }
+        node.className = 'w-full h-full object-cover';
+        box.append(node);
+    }
+
+    $('lb-file').addEventListener('change', e => {
+        const file = e.target.files[0];
+        if (!file) { pending = null; return; }
+        const isVideo = file.type.startsWith('video/'), isImage = file.type.startsWith('image/');
+        if (!isVideo && !isImage) { window.toast('फक्त फोटो किंवा व्हिडिओ निवडा.', 'error'); e.target.value = ''; return; }
+        if (file.size > 50 * 1024 * 1024) { window.toast('फाइल ५० MB पेक्षा लहान असावी.', 'error'); e.target.value = ''; return; }
+        pending = { file, type: isVideo ? 'video' : 'image' };
+        show(URL.createObjectURL(file), pending.type);
+    });
+
+    $('lb-save').addEventListener('click', async () => {
+        if (!pending) { window.toast('आधी फोटो किंवा व्हिडिओ निवडा.', 'error'); return; }
+        const btn = $('lb-save'); btn.disabled = true; btn.textContent = 'Uploading...';
+        $('lb-progress-wrap').classList.remove('hidden');
+        try {
+            await window.requireAdmin();
+            const url = await window.uploadFile(pending.file, 'admin/login_backgrounds', p => { $('lb-progress').style.width = p + '%'; });
+            await fb.setDoc(settingsRef(), { type: pending.type, url, updatedAt: new Date().toISOString() });
+            pending = null; $('lb-file').value = '';
+            window.toast('लॉगिन बॅकग्राउंड अपडेट झालं.');
+        } catch (e) { window.toast('अपलोड अयशस्वी: ' + e.message, 'error'); }
+        finally { btn.disabled = false; btn.textContent = 'Save & Publish'; $('lb-progress-wrap').classList.add('hidden'); $('lb-progress').style.width = '0%'; }
+    });
+
+    $('lb-reset').addEventListener('click', async () => {
+        if (!confirm('लॉगिन बॅकग्राउंड काढून डीफॉल्ट वापरायचं?')) return;
+        try {
+            await window.requireAdmin();
+            await fb.deleteDoc(settingsRef());
+            $('lb-preview').replaceChildren(document.createTextNode('अजून काही सेट केलेलं नाही (डीफॉल्ट वापरलं जातं)'));
+            window.toast('डीफॉल्टवर परत गेलं.');
+        } catch (e) { window.toast('अयशस्वी: ' + e.message, 'error'); }
+    });
+
+    fb.getDoc(settingsRef()).then(s => { if (s.exists() && s.data().url) show(s.data().url, s.data().type); }).catch(() => {});
+})();
+</script>
