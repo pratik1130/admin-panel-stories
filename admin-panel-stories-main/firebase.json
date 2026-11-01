@@ -1,7 +1,10 @@
 {
-  "database": {
-    "rules": "database.rules.json"
-  },
+  "firestore": [
+    {
+      "database": "ai-studio-audiostorytellin-1f7d4862-23fa-4201-99e8-8f3e17b87cf4",
+      "rules": "firestore.rules"
+    }
+  ],
   "storage": {
     "rules": "storage.rules"
   },
@@ -11,6 +14,29 @@
       "firebase.json",
       "**/.*",
       "**/node_modules/**"
+    ],
+    "headers": [
+      {
+        "source": "**",
+        "headers": [
+          {
+            "key": "X-Frame-Options",
+            "value": "DENY"
+          },
+          {
+            "key": "X-Content-Type-Options",
+            "value": "nosniff"
+          },
+          {
+            "key": "Referrer-Policy",
+            "value": "strict-origin-when-cross-origin"
+          },
+          {
+            "key": "Permissions-Policy",
+            "value": "camera=(), microphone=(), geolocation=()"
+          }
+        ]
+      }
     ]
   }
 }

@@ -6,10 +6,6 @@
     <title>Admin Panel - Complete Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-storage-compat.js"></script>
 </head>
 <body class="bg-[#0B0F19] text-white font-sans antialiased m-0 p-0">
 <div class="flex h-screen overflow-hidden">
@@ -19,6 +15,7 @@
             <nav class="space-y-1.5" aria-label="Admin sections">
                 <button onclick="switchTab('dashboard')" id="nav-dashboard" class="nav-item w-full flex items-center gap-3 px-4 py-2.5 rounded-xl bg-cyan-500/20 text-cyan-300 font-semibold text-sm transition-all"><i class="fa-solid fa-chart-pie w-5"></i> Dashboard</button>
                 <button onclick="switchTab('upload')" id="nav-upload" class="nav-item w-full flex items-center gap-3 px-4 py-2.5 rounded-xl hover:bg-white/5 text-white/70 hover:text-white font-semibold text-sm transition-all"><i class="fa-solid fa-cloud-arrow-up w-5"></i> Add Audiobook</button>
+                <button onclick="switchTab('content')" id="nav-content" class="nav-item w-full flex items-center gap-3 px-4 py-2.5 rounded-xl hover:bg-white/5 text-white/70 hover:text-white font-semibold text-sm transition-all"><i class="fa-solid fa-folder-open w-5"></i> Content Management</button>
                 <button onclick="switchTab('login_bg')" id="nav-login_bg" class="nav-item w-full flex items-center gap-3 px-4 py-2.5 rounded-xl hover:bg-white/5 text-white/70 hover:text-white font-semibold text-sm transition-all"><i class="fa-solid fa-image w-5"></i> Login Screen BG</button>
                 <button onclick="switchTab('coupons')" id="nav-coupons" class="nav-item w-full flex items-center gap-3 px-4 py-2.5 rounded-xl hover:bg-white/5 text-white/70 hover:text-white font-semibold text-sm transition-all"><i class="fa-solid fa-tags w-5"></i> Coupons & Offers</button>
                 <button onclick="switchTab('trending')" id="nav-trending" class="nav-item w-full flex items-center gap-3 px-4 py-2.5 rounded-xl hover:bg-white/5 text-white/70 hover:text-white font-semibold text-sm transition-all"><i class="fa-solid fa-fire w-5"></i> Trending Carousel</button>
@@ -49,28 +46,69 @@
         <div id="component-view" class="hidden opacity-0 transition-opacity duration-200" aria-live="polite"></div>
     </main>
 </div>
-<script>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/13.1.0/firebase-app.js";
+import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/13.1.0/firebase-auth.js";
+import { getFirestore, collection, doc, writeBatch, onSnapshot, query, orderBy, where, serverTimestamp, getDocs, getDoc, setDoc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js";
+import { getStorage, ref, uploadBytesResumable, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/13.1.0/firebase-storage.js";
+
 const firebaseConfig = {
     apiKey: "AIzaSyA4ICBmqlCSpjInjTaQt3Bhg2BLXm_lqTM",
     authDomain: "majestic-boulevard-mxctm.firebaseapp.com",
-    databaseURL: "https://majestic-boulevard-mxctm-default-rtdb.asia-southeast1.firebasedatabase.app",
     projectId: "majestic-boulevard-mxctm",
     storageBucket: "majestic-boulevard-mxctm.firebasestorage.app",
     messagingSenderId: "280298206143",
     appId: "1:280298206143:web:5748c78e3e5444650f670a"
 };
+// The mobile app uses this NAMED Firestore database (not "(default)").
+const FIRESTORE_DATABASE_ID = "ai-studio-audiostorytellin-1f7d4862-23fa-4201-99e8-8f3e17b87cf4";
 
-firebase.initializeApp(firebaseConfig);
-const auth = firebase.auth();
-const db = firebase.database();
-const storage = firebase.storage();
-let globalAudiobooks = [];
-let globalUsers = {};
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app, FIRESTORE_DATABASE_ID);
+const storage = getStorage(app);
+
+// Helpers used by the section files in /components (they are plain scripts).
+window.fb = { auth, db, storage, collection, doc, writeBatch, serverTimestamp, ref, uploadBytesResumable, getDownloadURL, query, where, orderBy, getDocs, getDoc, setDoc, updateDoc, deleteDoc, deleteObject };
+
+// Small toast notifications used by every section.
+window.toast = function(message, kind) {
+    let box = document.getElementById('toast-box');
+    if (!box) {
+        box = document.createElement('div');
+        box.id = 'toast-box';
+        box.className = 'fixed bottom-5 right-5 z-50 flex flex-col gap-2';
+        document.body.appendChild(box);
+    }
+    const item = document.createElement('div');
+    const color = kind === 'error' ? 'bg-red-600' : kind === 'info' ? 'bg-slate-600' : 'bg-emerald-600';
+    item.className = `${color} text-white text-sm font-semibold px-4 py-3 rounded-xl shadow-lg max-w-xs`;
+    item.textContent = message;
+    box.appendChild(item);
+    setTimeout(() => item.remove(), 4500);
+};
+
+// Uploads a file to Storage and resolves with its public download URL.
+window.uploadFile = function(file, folder, onProgress) {
+    const safeName = file.name.replace(/[^\w.\-]+/g, '_');
+    const path = `${folder}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}_${safeName}`;
+    const task = uploadBytesResumable(ref(storage, path), file, { contentType: file.type || undefined });
+    return new Promise((resolve, reject) => {
+        task.on('state_changed',
+            snap => onProgress && onProgress(Math.round((snap.bytesTransferred / snap.totalBytes) * 100)),
+            reject,
+            async () => { try { resolve(await getDownloadURL(task.snapshot.ref)); } catch (e) { reject(e); } });
+    });
+};
+window.globalAudiobooks = [];
+// Escapes text before it is placed into HTML. Use it for every value that came from the database.
+window.esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+window.globalUsers = {};
 let activeComponent = null;
-let dashboardCoverObjectUrls = [];
 
 const componentFiles = {
     upload: 'components/add-audiobook.html',
+    content: 'components/content-management.html',
     login_bg: 'components/login-bg.html',
     coupons: 'components/coupons.html',
     trending: 'components/trending.html',
@@ -88,9 +126,9 @@ function setActiveNavigation(tabId) {
     if (active) { active.classList.add('bg-cyan-500/20', 'text-cyan-300'); active.classList.remove('text-white/70'); }
 }
 
-async function logoutAdmin() {
+window.logoutAdmin = async function() {
     try {
-        await auth.signOut();
+        await signOut(auth);
         window.location.replace('/');
     } catch (error) {
         console.error('Unable to sign out:', error);
@@ -98,19 +136,15 @@ async function logoutAdmin() {
         status.textContent = `Unable to sign out: ${error.message}`;
         status.className = 'text-xs text-red-400';
     }
-}
+};
 
 function renderDashboardAudiobooks(list) {
-    dashboardCoverObjectUrls.forEach(url => URL.revokeObjectURL(url));
-    dashboardCoverObjectUrls = [];
     list.replaceChildren();
-
-    if (!globalAudiobooks.length) {
+    if (!window.globalAudiobooks.length) {
         list.innerHTML = '<div class="text-xs text-white/40">No audiobooks uploaded yet.</div>';
         return;
     }
-
-    globalAudiobooks.forEach(book => {
+    window.globalAudiobooks.forEach(book => {
         const row = document.createElement('div');
         row.className = 'bg-[#0B0F19] border border-white/10 p-3.5 rounded-xl flex items-center justify-between gap-4';
         const details = document.createElement('div');
@@ -118,18 +152,7 @@ function renderDashboardAudiobooks(list) {
         const image = document.createElement('img');
         image.alt = '';
         image.className = 'w-10 h-12 object-cover rounded-lg border border-white/10';
-        if (book.coverImagePath) {
-            storage.ref(book.coverImagePath).getBlob().then(blob => {
-                if (!image.isConnected) return;
-                const objectUrl = URL.createObjectURL(blob);
-                dashboardCoverObjectUrls.push(objectUrl);
-                image.src = objectUrl;
-            }).catch(error => {
-                console.error('Unable to load audiobook cover:', error);
-            });
-        } else if (book.coverImageUrl) {
-            image.src = book.coverImageUrl;
-        }
+        if (book.coverUrl) image.src = book.coverUrl;
 
         const text = document.createElement('div');
         const title = document.createElement('div');
@@ -142,14 +165,17 @@ function renderDashboardAudiobooks(list) {
         details.append(image, text);
 
         const badge = document.createElement('span');
-        badge.className = 'px-3 py-1 bg-emerald-500/20 text-emerald-400 text-xs font-bold rounded-full';
-        badge.textContent = 'Live on App';
+        const status = book.publishingStatus || 'published';
+        badge.className = status === 'published'
+            ? 'px-3 py-1 bg-emerald-500/20 text-emerald-400 text-xs font-bold rounded-full'
+            : 'px-3 py-1 bg-yellow-500/20 text-yellow-300 text-xs font-bold rounded-full';
+        badge.textContent = status === 'published' ? 'Live on App' : status;
         row.append(details, badge);
         list.append(row);
     });
 }
 
-async function switchTab(tabId) {
+window.switchTab = async function(tabId) {
     setActiveNavigation(tabId);
     const dashboard = document.getElementById('dashboard-view');
     const componentView = document.getElementById('component-view');
@@ -182,74 +208,51 @@ async function switchTab(tabId) {
         scripts.forEach(original => { const script = document.createElement('script'); script.textContent = original.textContent; document.body.appendChild(script); script.remove(); });
         requestAnimationFrame(() => componentView.classList.remove('opacity-0'));
     } catch (error) {
-        componentView.innerHTML = `<div class="rounded-xl border border-red-500/30 bg-red-500/10 p-6 text-red-300">${error.message}</div>`;
+        componentView.innerHTML = `<div class="rounded-xl border border-red-500/30 bg-red-500/10 p-6 text-red-300">${window.esc(error.message)}</div>`;
         console.error(error);
     }
-}
+};
 
 function fetchFirebaseData() {
     const status = document.getElementById('firebase-connection-status');
     const showDatabaseError = error => {
-        console.error('Firebase Realtime Database error:', error);
+        console.error('Firestore error:', error);
         status.textContent = `Database error: ${error.message}`;
         status.className = 'text-xs text-red-400';
     };
 
-    db.ref('.info/connected').on('value', snapshot => {
-        status.textContent = snapshot.val() ? 'Firebase connected.' : 'Connecting to Firebase...';
-        status.className = snapshot.val() ? 'text-xs text-emerald-400' : 'text-xs text-white/50';
+    onSnapshot(query(collection(db, 'audiobooks'), orderBy('createdAt', 'desc')), snapshot => {
+        status.textContent = 'Firestore connected (same database as the app).';
+        status.className = 'text-xs text-emerald-400';
+        window.globalAudiobooks = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+        document.getElementById('live-audiobook-count').innerText = window.globalAudiobooks.length;
+        renderDashboardAudiobooks(document.getElementById('firebase-audiobooks-list'));
+        if (typeof window.renderTrending === 'function' && activeComponent === 'trending') window.renderTrending();
+        if (typeof window.loadSectionBooks === 'function' && activeComponent === 'section_ordering') window.loadSectionBooks();
+        if (typeof window.renderContentList === 'function' && activeComponent === 'content') window.renderContentList();
     }, showDatabaseError);
 
-    db.ref('audiobooks/').on('value', snapshot => {
-        const data = snapshot.val() || {};
-        const keys = Object.keys(data);
-        document.getElementById('live-audiobook-count').innerText = keys.length;
-        globalAudiobooks = keys.map(id => ({ id, ...data[id] }));
-        const list = document.getElementById('firebase-audiobooks-list');
-        renderDashboardAudiobooks(list);
-        if (typeof renderTrending === 'function' && activeComponent === 'trending') renderTrending();
-        if (typeof loadSectionBooks === 'function' && activeComponent === 'section_ordering') loadSectionBooks();
-    }, showDatabaseError);
-
-    db.ref('users/').on('value', snapshot => {
-        globalUsers = snapshot.val() || {};
-        document.getElementById('live-user-count').innerText = Object.keys(globalUsers).length;
-        if (typeof renderRegisteredUsers === 'function' && activeComponent === 'users') renderRegisteredUsers();
+    onSnapshot(collection(db, 'users'), snapshot => {
+        const users = {};
+        snapshot.forEach(d => { users[d.id] = d.data(); });
+        window.globalUsers = users;
+        document.getElementById('live-user-count').innerText = snapshot.size;
+        if (typeof window.renderRegisteredUsers === 'function' && activeComponent === 'users') window.renderRegisteredUsers();
     }, showDatabaseError);
 }
 
+// Always re-checks the admin claim with a freshly refreshed token.
 window.requireAdmin = async function() {
     const user = auth.currentUser;
     if (!user) throw new Error('Please sign in with an administrator account.');
-    const token = await user.getIdTokenResult();
+    const token = await user.getIdTokenResult(true);
     if (token.claims.admin !== true) throw new Error('This account does not have the Firebase admin claim.');
-};
-
-window.waitForDatabaseConnection = function(timeoutMs = 15000) {
-    return new Promise((resolve, reject) => {
-        const connectedRef = db.ref('.info/connected');
-        const onConnectionChange = snapshot => {
-            if (snapshot.val() === true) finish();
-        };
-        const onError = error => finish(error);
-        const timeout = setTimeout(() => {
-            finish(new Error('Could not connect to Realtime Database. Check the configured database URL and network.'));
-        }, timeoutMs);
-
-        function finish(error) {
-            clearTimeout(timeout);
-            connectedRef.off('value', onConnectionChange);
-            if (error) reject(error);
-            else resolve();
-        }
-
-        connectedRef.on('value', onConnectionChange, onError);
-    });
 };
 
 async function initializeAdminDashboard() {
     const user = await new Promise((resolve, reject) => {
-        const unsubscribe = auth.onAuthStateChanged(
+        const unsubscribe = onAuthStateChanged(
+            auth,
             currentUser => { unsubscribe(); resolve(currentUser); },
             error => { unsubscribe(); reject(error); }
         );
@@ -261,20 +264,18 @@ async function initializeAdminDashboard() {
 
     const token = await user.getIdTokenResult();
     if (token.claims.admin !== true) {
-        await auth.signOut();
+        await signOut(auth);
         window.location.replace('/');
         return;
     }
     fetchFirebaseData();
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-    initializeAdminDashboard().catch(error => {
-        console.error('Unable to initialize the admin dashboard:', error);
-        const status = document.getElementById('firebase-connection-status');
-        status.textContent = `Firebase initialization error: ${error.message}`;
-        status.className = 'text-xs text-red-400';
-    });
+initializeAdminDashboard().catch(error => {
+    console.error('Unable to initialize the admin dashboard:', error);
+    const status = document.getElementById('firebase-connection-status');
+    status.textContent = `Firebase initialization error: ${error.message}`;
+    status.className = 'text-xs text-red-400';
 });
 </script>
 </body>

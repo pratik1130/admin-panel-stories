@@ -1,9 +1,86 @@
 <section class="space-y-6 max-w-4xl mx-auto">
-    <div class="flex items-center justify-between border-b border-white/10 pb-4"><h2 class="text-2xl font-bold">Section Ordering & Feed Management</h2><button onclick="switchTab('dashboard')" class="text-white/50 hover:text-white" aria-label="Close"><i class="fa-solid fa-xmark text-xl"></i></button></div>
-    <div class="bg-[#131722] border border-white/10 p-6 rounded-2xl shadow-xl space-y-4"><label class="block text-xs font-semibold text-white/70">Select Feed Category</label><select id="feed-category-select" onchange="loadSectionBooks()" class="w-full bg-[#0B0F19] border border-white/20 rounded-xl px-4 py-2.5 text-sm text-white"><option value="popular">लोकप्रिय (Popular)</option><option value="trending">ट्रेंडिंग (Trending)</option><option value="new">नवीन (New)</option><option value="horror">हॉरर (Horror)</option></select></div>
-    <div id="section-order-list" class="space-y-3"></div>
+    <div class="flex items-center justify-between border-b border-white/10 pb-4">
+        <div>
+            <h2 class="text-2xl font-bold">Section Ordering</h2>
+            <p class="text-xs text-white/50 mt-1">कॅटेगरी निवडा, पुस्तकं ड्रॅग करा (किंवा बाण वापरा) आणि क्रम सेव्ह करा. १ नंबर अ‍ॅपमध्ये सर्वात आधी दिसतं.</p>
+        </div>
+        <button onclick="switchTab('dashboard')" class="text-white/50 hover:text-white" aria-label="Close"><i class="fa-solid fa-xmark text-xl"></i></button>
+    </div>
+    <div class="flex flex-col sm:flex-row gap-3 sm:items-center">
+        <select id="so-section" class="flex-1 bg-[#0B0F19] border border-white/20 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-cyan-400"></select>
+        <button id="so-save" class="px-5 py-3 rounded-xl bg-cyan-500 text-black text-sm font-bold disabled:opacity-40" disabled>Save Order</button>
+    </div>
+    <div id="so-hint" class="text-xs text-white/40"></div>
+    <div id="so-list" class="space-y-2"></div>
+    <p class="text-[11px] text-white/30">टीप: प्रत्येक पुस्तकाला एकच क्रमांक (rank) असतो, त्यामुळे एका पुस्तकाचा क्रम त्याच्या सर्व कॅटेगरीजमध्ये लागू होतो.</p>
 </section>
 <script>
-function loadSectionBooks() { const container = document.getElementById('section-order-list'); if (!container) return; container.innerHTML = globalAudiobooks.length ? globalAudiobooks.map((book, index) => `<div class="bg-[#131722] border border-white/10 p-3.5 rounded-xl flex items-center justify-between"><div class="text-sm font-bold">${index + 1}. ${book.title} - <span class="text-cyan-400">${book.author}</span></div></div>`).join('') : '<div class="p-4 text-center text-white/40">कोणतीही ऑडिओबुक उपलब्ध नाही.</div>'; }
-loadSectionBooks();
+(function () {
+    const fb = window.fb;
+    const $ = id => document.getElementById(id);
+    const SECTIONS = [['Popular','लोकप्रिय (Popular)'],['Trending','ट्रेंडिंग (Trending)'],['New','नवीन (New & Hot)'],['Horror','हॉरर (Horror)'],['Thriller','थ्रिलर (Thriller)'],['Suspense','सस्पेन्स (Suspense)'],['Romantic','रोमँटिक (Romantic)'],['Education','शैक्षणिक (Education)'],['Top Series','टॉप सिरीज (Top Series)']];
+    let order = [], dirty = false, dragIndex = null;
+
+    function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; }
+    const rankOf = b => typeof b.rank === 'number' ? b.rank : 999;
+    const inSection = (b, s) => s === 'Top Series' ? !!b.isTopSeries : ((b.categories || []).includes(s) || b.category === s);
+
+    function setDirty(v) { dirty = v; $('so-save').disabled = !v; $('so-hint').textContent = v ? 'सेव्ह न केलेले बदल आहेत.' : ''; }
+
+    function move(from, to) {
+        if (to < 0 || to >= order.length || from === to) return;
+        const [item] = order.splice(from, 1); order.splice(to, 0, item); setDirty(true); render();
+    }
+
+    function render() {
+        const list = $('so-list'); list.replaceChildren();
+        if (!order.length) { list.append(el('div', 'text-sm text-white/40 py-8 text-center', 'या कॅटेगरीत अजून पुस्तकं नाहीत.')); return; }
+        order.forEach((b, i) => {
+            const row = el('div', 'bg-[#0B0F19] border border-white/10 rounded-xl px-3 py-2.5 flex items-center gap-3');
+            row.draggable = true;
+            row.addEventListener('dragstart', () => { dragIndex = i; row.classList.add('opacity-50'); });
+            row.addEventListener('dragend', () => row.classList.remove('opacity-50'));
+            row.addEventListener('dragover', e => e.preventDefault());
+            row.addEventListener('drop', e => { e.preventDefault(); if (dragIndex !== null) move(dragIndex, i); dragIndex = null; });
+            row.append(el('i', 'fa-solid fa-grip-vertical text-white/30 cursor-grab'));
+            row.append(el('div', 'w-8 text-center font-bold text-cyan-300', String(i + 1)));
+            const img = el('img', 'w-9 h-11 object-cover rounded-md bg-white/5'); img.alt = ''; if (b.coverUrl) img.src = b.coverUrl; row.append(img);
+            const info = el('div', 'flex-1 min-w-0');
+            info.append(el('div', 'text-sm font-bold text-white truncate', b.title || ''), el('div', 'text-xs text-white/40 truncate', b.author || ''));
+            row.append(info);
+            if ((b.publishingStatus || 'published') !== 'published') row.append(el('span', 'px-2 py-0.5 bg-yellow-500/20 text-yellow-300 text-[10px] font-bold rounded-full', b.publishingStatus));
+            const up = el('button', 'w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20', ''); up.innerHTML = '<i class="fa-solid fa-chevron-up text-xs"></i>'; up.setAttribute('aria-label', 'Move up'); up.addEventListener('click', () => move(i, i - 1));
+            const down = el('button', 'w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20', ''); down.innerHTML = '<i class="fa-solid fa-chevron-down text-xs"></i>'; down.setAttribute('aria-label', 'Move down'); down.addEventListener('click', () => move(i, i + 1));
+            row.append(up, down);
+            list.append(row);
+        });
+    }
+
+    window.loadSectionBooks = function (force) {
+        if (dirty && !force) return; // never overwrite unsaved changes with a live refresh
+        const s = $('so-section').value;
+        order = (window.globalAudiobooks || []).filter(b => inSection(b, s)).sort((a, b) => rankOf(a) - rankOf(b));
+        render();
+    };
+
+    async function save() {
+        const btn = $('so-save'); btn.disabled = true; btn.textContent = 'Saving...';
+        try {
+            await window.requireAdmin();
+            const batch = fb.writeBatch(fb.db);
+            order.forEach((b, i) => batch.update(fb.doc(fb.db, 'audiobooks', b.id), { rank: i + 1 }));
+            await batch.commit();
+            setDirty(false); window.toast('क्रम सेव्ह झाला. अ‍ॅपमध्ये लगेच दिसेल.');
+        } catch (e) { window.toast('सेव्ह अयशस्वी: ' + e.message, 'error'); btn.disabled = false; }
+        finally { btn.textContent = 'Save Order'; }
+    }
+
+    SECTIONS.forEach(([v, l]) => { const o = el('option', '', l); o.value = v; $('so-section').append(o); });
+    $('so-section').addEventListener('change', () => {
+        if (dirty && !confirm('सेव्ह न केलेले बदल जातील. पुढे जायचं?')) return;
+        setDirty(false); window.loadSectionBooks(true);
+    });
+    $('so-save').addEventListener('click', save);
+    window.loadSectionBooks(true);
+})();
 </script>

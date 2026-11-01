@@ -1,0 +1,129 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------- helpers ----------
+    function signedIn() { return request.auth != null; }
+    function isAdmin() { return signedIn() && request.auth.token.admin == true; }
+    function isOwner(uid) { return signedIn() && request.auth.uid == uid; }
+    function shortStr(v, max) { return v is string && v.size() <= max; }
+    function optStr(d, key, max) { return !(key in d) || shortStr(d[key], max); }
+
+    function validBook(d) {
+      return shortStr(d.title, 200) && d.title.size() > 0
+        && shortStr(d.author, 200)
+        && optStr(d, 'synopsis', 5000)
+        && optStr(d, 'coverUrl', 2048)
+        && optStr(d, 'audioUrl', 2048)
+        && (!('isPremium' in d) || d.isPremium is bool)
+        && (!('isTopSeries' in d) || d.isTopSeries is bool)
+        && (!('categories' in d) || (d.categories is list && d.categories.size() <= 20))
+        && (!('publishingStatus' in d) || d.publishingStatus in ['published', 'private', 'unlisted', 'scheduled']);
+    }
+
+    function validEpisode(d) {
+      return shortStr(d.title, 200)
+        && optStr(d, 'author', 200)
+        && optStr(d, 'description', 2000)
+        && optStr(d, 'audioUrl', 2048)
+        && optStr(d, 'coverUrl', 2048)
+        && optStr(d, 'teaserVideoUrl', 2048)
+        && (!('episodeNumber' in d) || d.episodeNumber is int);
+    }
+
+    function validTranscript(d) {
+      return (!('segments' in d) || (d.segments is list && d.segments.size() <= 5000))
+        && optStr(d, 'rawText', 400000);
+    }
+
+    // ---------- public catalogue: anyone reads, only admins write ----------
+    match /audiobooks/{bookId} {
+      allow read: if true;
+      allow create, update: if isAdmin() && validBook(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /episodes/{epId} {
+      allow read: if true;
+      allow create, update: if isAdmin() && validEpisode(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /transcripts/{trId} {
+      allow read: if true;
+      allow create, update: if isAdmin() && validTranscript(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /settings/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /appSettings/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Coupon codes are not public: only signed-in users can read them.
+    match /coupons/{id} {
+      allow read: if signedIn();
+      allow write: if isAdmin();
+    }
+
+    // ---------- listen counters: the app may add exactly +1 per listen ----------
+    match /audiobook_stats/{bookId} {
+      allow read: if true;
+      allow create: if isAdmin() || (signedIn()
+        && request.resource.data.keys().hasOnly(['listenCount', 'lastEvent', 'title', 'createdAt', 'updatedAt'])
+        && request.resource.data.listenCount == 1);
+      allow update: if isAdmin() || (signedIn()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['listenCount', 'lastEvent', 'title', 'updatedAt'])
+        && request.resource.data.listenCount == resource.data.listenCount + 1);
+      allow delete: if isAdmin();
+    }
+
+    // ---------- per-user data: owner (and admin) only ----------
+    match /users/{uid} {
+      allow read: if isOwner(uid) || isAdmin();
+      // Users cannot grant themselves privileges or write oversized free text.
+      allow create, update: if isOwner(uid)
+        && !('admin' in request.resource.data)
+        && !('role' in request.resource.data)
+        && optStr(request.resource.data, 'name', 100)
+        && optStr(request.resource.data, 'displayName', 100)
+        && optStr(request.resource.data, 'email', 254);
+      allow create, update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /user_libraries/{uid} {
+      allow read, write: if isOwner(uid) || isAdmin();
+    }
+
+    // Coins are still client-written by the app. Rules only block negative balances.
+    // The real fix is to move coin changes into Cloud Functions (see recommendations).
+    match /user_coins/{uid} {
+      allow read: if isOwner(uid) || isAdmin();
+      allow create, update: if (isOwner(uid) && (!('coins' in request.resource.data) || (request.resource.data.coins is number && request.resource.data.coins >= 0)))
+        || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Purchases / subscriptions: written by admins or the backend only.
+    match /subscriptions/{id} {
+      allow read: if isAdmin() || (signedIn() && (id == request.auth.uid || resource.data.userId == request.auth.uid));
+      allow write: if isAdmin();
+    }
+
+    match /fcm_tokens/{token} {
+      allow create, update: if signedIn() && request.resource.data.userId == request.auth.uid;
+      allow read, delete: if isAdmin();
+    }
+
+    // Everything else is closed.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

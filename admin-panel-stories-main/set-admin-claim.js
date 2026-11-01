@@ -1,50 +1,48 @@
 "use strict";
-
+// Usage:
+//   node set-admin-claim.js <FIREBASE_UID>           -> grant admin
+//   node set-admin-claim.js <FIREBASE_UID> --revoke  -> remove admin and kill active sessions
 const fs = require("fs");
 const path = require("path");
 const { initializeApp, cert } = require("firebase-admin/app");
 const { getAuth } = require("firebase-admin/auth");
 
-const serviceAccountPath = [
-  path.join(__dirname, "firebase-admin-key.json"),
-  path.join(__dirname, "service-account.json"),
-  path.join(__dirname, "service account.json"),
-].find((filePath) => fs.existsSync(filePath));
+const EXPECTED_PROJECT = "majestic-boulevard-mxctm";
+const uid = process.argv[2];
+const revoke = process.argv.includes("--revoke");
 
-if (!serviceAccountPath) {
-  console.error(
-    "Service account file not found.\n" +
-      "Save the JSON in the project root as firebase-admin-key.json."
-  );
+if (!uid || !/^[A-Za-z0-9]{1,128}$/.test(uid)) {
+  console.error("Usage: node set-admin-claim.js <FIREBASE_UID> [--revoke]");
   process.exit(1);
 }
 
-const serviceAccount = require(serviceAccountPath);
-
-if (
-  serviceAccount.project_id !== "majestic-boulevard-mxctm" ||
-  serviceAccount.client_email !==
-    "firebase-adminsdk-fbsvc@majestic-boulevard-mxctm.iam.gserviceaccount.com"
-) {
-  console.error("The service account JSON does not match the expected Firebase project.");
+const keyPath = path.join(__dirname, "firebase-admin-key.json");
+if (!fs.existsSync(keyPath)) {
+  console.error("firebase-admin-key.json not found in the project root. Keep it local; never commit it.");
   process.exit(1);
 }
 
-console.log("Initializing Firebase Admin with service account...");
+const serviceAccount = JSON.parse(fs.readFileSync(keyPath, "utf8"));
+if (serviceAccount.project_id !== EXPECTED_PROJECT) {
+  console.error(`Key belongs to "${serviceAccount.project_id}", expected "${EXPECTED_PROJECT}". Aborting.`);
+  process.exit(1);
+}
 
-initializeApp({
-  credential: cert(serviceAccount),
+initializeApp({ credential: cert(serviceAccount) });
+const auth = getAuth();
+
+(async () => {
+  const user = await auth.getUser(uid); // fails fast if the UID does not exist
+  if (revoke) {
+    await auth.setCustomUserClaims(uid, { admin: false });
+    await auth.revokeRefreshTokens(uid);
+    console.log(`Admin revoked and sessions ended for ${user.email || uid}`);
+  } else {
+    await auth.setCustomUserClaims(uid, { admin: true });
+    console.log(`Admin granted to ${user.email || uid}. The user must sign out and sign in again.`);
+  }
+  process.exit(0);
+})().catch(e => {
+  console.error("Failed:", e.code || "", e.message);
+  process.exit(1);
 });
-
-const uid = "1JQQmgpnOsVO6LAFHTYzzvx5o6p2";
-
-getAuth()
-  .setCustomUserClaims(uid, { admin: true })
-  .then(() => {
-    console.log("Successfully set admin claim for user:", uid);
-    process.exit(0);
-  })
-  .catch((error) => {
-    console.error("Error setting custom claims:", error.code, error.message);
-    process.exit(1);
-  });

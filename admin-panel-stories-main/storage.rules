@@ -1,12 +1,53 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
+
     function isAdmin() {
       return request.auth != null && request.auth.token.admin == true;
     }
+    function isImage(maxMb) {
+      return request.resource.contentType.matches('image/.*')
+        && request.resource.size <= maxMb * 1024 * 1024;
+    }
+    function isAudio() {
+      return request.resource.contentType.matches('audio/.*')
+        && request.resource.size <= 500 * 1024 * 1024;
+    }
+    function isMp4() {
+      return request.resource.contentType == 'video/mp4'
+        && request.resource.size <= 200 * 1024 * 1024;
+    }
 
+    // The app plays and displays these, so they are public to read.
+    match /covers/{file} {
+      allow read: if true;
+      allow create, update: if isAdmin() && isImage(5);
+      allow delete: if isAdmin();
+    }
+
+    match /episodes/{file} {
+      allow read: if true;
+      allow create, update: if isAdmin() && isAudio();
+      allow delete: if isAdmin();
+    }
+
+    match /teasers/{file} {
+      allow read: if true;
+      allow create, update: if isAdmin() && isMp4();
+      allow delete: if isAdmin();
+    }
+
+    match /admin/login_backgrounds/{file} {
+      allow read: if true;
+      allow create, update: if isAdmin()
+        && (isImage(50) || (request.resource.contentType.matches('video/.*') && request.resource.size <= 50 * 1024 * 1024));
+      allow delete: if isAdmin();
+    }
+
+    // Anything else: readable, never writable from clients.
     match /{allPaths=**} {
-      allow read, write: if isAdmin();
+      allow read: if true;
+      allow write: if false;
     }
   }
 }
